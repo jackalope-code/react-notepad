@@ -1,6 +1,6 @@
 {
-  "name": "notepadjs",
-  "homepage": "https://jackalope-code.github.io/notepadjs/",
+  "name": "react-notepad",
+  "homepage": "https://jackalope-code.github.io/react-notepad",
   "private": true,
   "version": "0.0.0",
   "type": "module",
