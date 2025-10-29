@@ -9,9 +9,12 @@ Bootstrapped with vite. This app is available at https://jackalope-code.github.i
 
 ## To-Do
 * More Notepad features
+  * Editor
+    * Line numbers
   * Text
     * Font size
     * Font style
+    * Permanent highlighting (and the ability to toggle off all styles for e.g. pasting code)
     * Markdown formatting
     * Find/Replace with regex
 * Better Notepad abstractions (Use a context with Notepad.js?)
