@@ -65,6 +65,6 @@ justify-content: space-between;
   font-size: inherit;
   padding: none;
   width: auto;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   font-weight: 600;
 `;function im(){const[i,r,o,s]=em();return $t.jsxs($t.Fragment,{children:[$t.jsx(am,{children:$t.jsx("span",{children:"react-notepad"})}),$t.jsx(cm,{type:"text",onChange:g=>s(g.currentTarget.value),value:o}),$t.jsx(nm,{text:i,setText:r}),$t.jsx(tm,{})]})}k1.createRoot(document.getElementById("root")).render($t.jsx(Ku.StrictMode,{children:$t.jsx(im,{})}));
