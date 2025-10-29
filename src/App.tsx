@@ -2,7 +2,7 @@ import styled from 'styled-components';
 import Footer from './Footer'
 import NavBar from './NavBar'
 import Notepad, { useNotepad, type NotepadOptions } from './Notepad'
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 
 
 const TitleInput = styled.input`
@@ -17,7 +17,7 @@ const TitleInput = styled.input`
 `;
 
 function App() {
-    const [text, setText, title, setTitle, options, setOptions] = useNotepad();
+    const [text, setText, title, setTitle, options, _] = useNotepad();
     const [optionsObj, setOptionsObj] = useState<NotepadOptions>()
     useEffect(() => {
       if(options) {
@@ -25,10 +25,10 @@ function App() {
       }
     }, [options])
 
-    function handleOptionChanged(optionTarget: string, e: InputEvent) {
+    function handleOptionChanged(optionTarget: string, e: ChangeEvent<HTMLInputElement>) {
       switch(optionTarget) {
         case 'options.text.notepadWrap':
-          setOptionsObj({...optionsObj, text: {...optionsObj?.text, notepadWrap: !optionsObj?.text.notepadWrap}})
+          setOptionsObj({...optionsObj, text: {...optionsObj?.text, notepadWrap: e.currentTarget.checked}})
       }
     }
 

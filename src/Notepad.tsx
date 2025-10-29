@@ -1,6 +1,5 @@
 import styled from 'styled-components';
 import useLocalStorage from './utils/useLocalStorage';
-import { useEffect } from 'react';
 //import {LocalStorage} from './utils/persistence'
 
 type TextAreaProps = NotepadOptions["text"];
