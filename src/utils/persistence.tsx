@@ -5,7 +5,7 @@ export interface LocalStorageProps {
 }
 
 export const LocalStorage: React.FunctionComponent<LocalStorageProps>= ({fieldNames}) => {
-  const [objData, setObjData] = useState<{[key: string]: any}>({});
+  const [objData, _] = useState<{[key: string]: any}>({});
   
   useEffect(() => {
     const localStorageDataOb: {[key: string]: string} = {};
@@ -27,13 +27,13 @@ export const LocalStorage: React.FunctionComponent<LocalStorageProps>= ({fieldNa
     }
   }
 
-  function clearLocalStorageData() {
-    console.log("clear localStorage items");
-    console.log(fieldNames.forEach(key => console.log(key)))
-    fieldNames.forEach(key => {
-      localStorage.removeItem(key);
-    })
-  }
+  // function clearLocalStorageData() {
+  //   console.log("clear localStorage items");
+  //   console.log(fieldNames.forEach(key => console.log(key)))
+  //   fieldNames.forEach(key => {
+  //     localStorage.removeItem(key);
+  //   })
+  // }
   return (<>
     <h2>LocalStorage</h2>
     <div>
