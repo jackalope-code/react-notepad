@@ -3,7 +3,8 @@ import Footer from './Footer'
 import NavBar from './NavBar'
 import Notepad, { useNotepad, type NotepadOptions } from './Notepad'
 import { useEffect, useState, type ChangeEvent } from 'react';
-
+import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
 
 const TitleInput = styled.input`
   border: none;
@@ -44,6 +45,7 @@ function App() {
     <>
       <NavBar>
           <span>react-notepad</span>
+          <a href="https://github.com/jackalope-code/react-notepad"><FontAwesomeIcon icon={faGithub} className="icon"/></a>
       </NavBar>
       <div className="toolbar">
         <input type="checkbox" name="input-wrap-text" checked={optionsObj?.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>

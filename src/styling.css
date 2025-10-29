@@ -20,3 +20,25 @@ textarea {
 .toolbar {
     padding-left: 10px;
 }
+
+@media print {
+    nav {
+        display: none;
+    }
+    .title {
+        display: none;
+    }
+    input {
+        display: none;
+    }
+    label {
+        display: none;
+    }
+    textarea {
+        height: 60dvh;
+    }
+}
+
+.icon {
+    color: white;
+}
