@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import styled from 'styled-components';
+import useLocalStorage from './utils/useLocalStorage';
+import {LocalStorage} from './utils/persistence'
 
 const StyledTextArea = styled.textarea`
     width: 100%;
@@ -11,22 +13,45 @@ const StyledTextArea = styled.textarea`
     highlight-color: lightgray;
 `;
 
-const Notepad = () => {
+//const NotepadContext = createContext({lines: [''], getText, setText})
+
+const useNotepad = () => {
+    //const notepadContext = useContext(NotepadContext)
     const [lines, setLines] = useState<string[]> (['']);
+
+    const [text, setText] = useLocalStorage('react-notepad', '');
+
+    useEffect(() => {
+        setLines(text.split("\n"));
+    }, [text])
+
 
     function getText(): string {
         return lines.join('\n');
     }
 
+    // function setText(value: string) {
+    //         setLines(value.split("\n"));
+    // }
+
+    return [text, getText, setText, setLines] as [string, typeof getText, typeof setText, typeof setLines];
+}
+
+const Notepad = () => {
+
+    const [text, getText, setText, setLines] = useNotepad();
+
     function handleTextChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
         const text = event.target.value;
-        const updatedLines = text.split('\n');
-        setLines(updatedLines);
+        //const updatedLines = text.split('\n');
+        setText(text);
     }
 
     return (
         <>
-            <StyledTextArea wrap="off" value={getText()} onChange={handleTextChange}></StyledTextArea>
+            {/* For debugging */}
+            {/* <LocalStorage fieldNames={['react-notepad']} /> */}
+            <StyledTextArea wrap="off" value={text} onChange={handleTextChange}></StyledTextArea>
         </>
     );
 }
