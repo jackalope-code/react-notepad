@@ -5,8 +5,11 @@ interface NavBarProps {
 }
 
 const StyledNav = styled.nav`
-display: flex;
-justify-content: space-between;
+  display: flex;
+  justify-content: space-between;
+  background-color: #0C0C0C;
+  color: white;
+  padding: 10px;
 `;
 
 function NavBar({children}: NavBarProps) {

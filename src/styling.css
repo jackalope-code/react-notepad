@@ -1,4 +1,18 @@
 textarea {
     line-height: 1.5;
-    padding: 20px;
+    padding: 10px;
+}
+
+.title {
+    margin-left: 10px;
+}
+
+::selection {
+  background: yellow;
+}
+::-moz-selection {
+  background: yellow;
+}
+::-webkit-selection {
+  background: yellow;
 }
