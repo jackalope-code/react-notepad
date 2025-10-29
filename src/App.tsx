@@ -11,7 +11,7 @@ const TitleInput = styled.input`
   font-size: inherit;
   padding: none;
   width: auto;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   font-weight: 600;
 `;
 
