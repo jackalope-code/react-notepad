@@ -14,11 +14,12 @@ const StyledTextArea = styled.textarea`
 
 //const NotepadContext = createContext({lines: [''], getText, setText})
 
-const useNotepad = () => {
+export const useNotepad = () => {
     //const notepadContext = useContext(NotepadContext)
     // const [lines, setLines] = useState<string[]> (['']);
 
-    const [text, setText] = useLocalStorage('react-notepad', '');
+    const [title, setTitle] = useLocalStorage('react-notepad-title', 'Title');
+    const [text, setText] = useLocalStorage('react-notepad-text', '');
 
     // useEffect(() => {
     //     setLines(text.split("\n"));
@@ -34,12 +35,15 @@ const useNotepad = () => {
     // }
 
     //return [text, getText, setText, setLines] as [string, typeof getText, typeof setText, typeof setLines];
-    return [text, setText] as [string, typeof setText];
+    return [text, setText, title, setTitle] as [string, typeof setText, string, typeof setTitle];
 }
 
-const Notepad = () => {
+interface NotepadProps {
+    text: string;
+    setText: React.Dispatch<string>;
+}
 
-    const [text, setText] = useNotepad();
+const Notepad = ({text, setText}: NotepadProps) => {
 
     function handleTextChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
         const text = event.target.value;

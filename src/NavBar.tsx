@@ -1,9 +1,21 @@
+import styled from "styled-components";
 
-function NavBar() {
+interface NavBarProps {
+  children?: React.ReactNode;
+}
+
+const StyledNav = styled.nav`
+display: flex;
+justify-content: space-between;
+`;
+
+function NavBar({children}: NavBarProps) {
 
   return (
     <>
-
+      <StyledNav>
+        {children}
+      </StyledNav>
     </>
   )
 }
