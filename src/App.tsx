@@ -46,8 +46,8 @@ function App() {
           <span>react-notepad</span>
       </NavBar>
       <div className="toolbar">
-        <label htmlFor="input-wrap-text">Wrap text</label>
         <input type="checkbox" name="input-wrap-text" checked={optionsObj?.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>
+        <label htmlFor="input-wrap-text">Wrap text</label>
       </div>
       <TitleInput className="title" type="text" onChange={(e) => setTitle(e.currentTarget.value)} value={title} />
         {/* TODO Add a check on JSON parsing */}

@@ -16,3 +16,7 @@ textarea {
 ::-webkit-selection {
   background: yellow;
 }
+
+.toolbar {
+    padding-left: 10px;
+}
