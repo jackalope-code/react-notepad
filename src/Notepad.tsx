@@ -65,7 +65,7 @@ const Notepad = ({text, setText, options}: NotepadProps) => {
         <>
             {/* For debugging */}
             {/* <LocalStorage fieldNames={['react-notepad']} /> */}
-            <StyledTextArea notepadWrap={options.text.notepadWrap} wrap={options.text.notepadWrap ? "off" : "on"} value={text} onChange={handleTextChange}></StyledTextArea>
+            <StyledTextArea wrap={options.text.notepadWrap ? "on" : "off"} notepadWrap={options.text.notepadWrap} value={text} onChange={handleTextChange}></StyledTextArea>
         </>
     );
 }

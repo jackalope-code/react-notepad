@@ -16,12 +16,20 @@ const TitleInput = styled.input`
   font-weight: 600;
 `;
 
+const tempOptions = {text: {notepadWrap: true}};
+
 function App() {
     const [text, setText, title, setTitle, options, _] = useNotepad();
-    const [optionsObj, setOptionsObj] = useState<NotepadOptions>()
+    const [optionsObj, setOptionsObj] = useState<NotepadOptions>(tempOptions)
     useEffect(() => {
-      if(options) {
-        setOptionsObj(JSON.parse(options))
+      try {
+        if(options) {
+          setOptionsObj(JSON.parse(options))
+        } else {
+          setOptionsObj(tempOptions)
+        }
+      } catch(e: any) {
+        setOptionsObj(tempOptions)
       }
     }, [options])
 
@@ -43,8 +51,8 @@ function App() {
       </div>
       <TitleInput className="title" type="text" onChange={(e) => setTitle(e.currentTarget.value)} value={title} />
         {/* TODO Add a check on JSON parsing */}
-      {/* <Notepad text={text} setText={setText} options={JSON.parse(options)}></Notepad> */}
-      <Notepad text={text} setText={setText} options={{text: {notepadWrap: true}}}></Notepad>
+      <Notepad text={text} setText={setText} options={optionsObj}></Notepad>
+      {/* <Notepad text={text} setText={setText} options={{text: {notepadWrap: true}}}></Notepad> */}
       <Footer></Footer>
     </>
   )
