@@ -9,14 +9,20 @@ textarea {
 
 ::selection {
   background: yellow;
+  color: black;
 }
 ::-moz-selection {
   background: yellow;
+  color: black;
 }
 ::-webkit-selection {
   background: yellow;
+  color: black;
 }
 
+.icon:hover {
+    color: yellow;
+}
 .toolbar {
     padding-left: 10px;
 }
