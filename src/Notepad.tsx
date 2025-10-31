@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import useLocalStorage from './utils/useLocalStorage';
+import { debounce } from './utils/functions';
 //import {LocalStorage} from './utils/persistence'
 
 type TextAreaProps = NotepadOptions["text"];
@@ -15,7 +16,29 @@ const StyledTextArea = styled.textarea<TextAreaProps>`
     resize: none;
 `;
 
-//const NotepadContext = createContext({lines: [''], getText, setText})
+// enum DiffOperation {
+//     INSERT, MODIFY, DELETE
+// }
+// interface LineDifference {
+//     lineNum: number;
+//     characterPosition: number;
+//     operation: DiffOperation;
+//     text?: string
+
+// }
+
+// //const NotepadContext = createContext({lines: [''], getText, setText})
+
+// function diff(originalText: string, modifiedText: string) {
+//     const maxLen = Math.max(originalText.length, modifiedText.length);
+//     for(let i = 0; i < maxLen; i++) {
+        
+//     }
+// }
+
+// function applyDiff(originalText, diff: Difference) {
+
+// }
 
 export const useNotepad = () => {
     //const notepadContext = useContext(NotepadContext)
@@ -24,10 +47,26 @@ export const useNotepad = () => {
     const [title, setTitle] = useLocalStorage('react-notepad-title', 'Title');
     const [text, setText] = useLocalStorage('react-notepad-text', '');
     const [options, setOptions] = useLocalStorage('react-notepad-options', JSON.stringify({text: {notepadWrap: true}}))
+    const [stateHistory, setStateHistory] = useLocalStorage('react-notepad-undo-redo-history', JSON.stringify([]));
+    const [stateIndex, setStateIndex] = useLocalStorage('react-notepad-state-index', '0');
+
     // useEffect(() => {
     //     setLines(text.split("\n"));
     // }, [text])
 
+    function historyAwareSetText(text: string) {
+        setText(text);
+        const stateHistoryArray = JSON.parse(stateHistory)
+        setStateHistory(JSON.stringify({...stateHistoryArray, text}));
+    }
+
+    function setStateIndexNumeric(index: number) {
+        setStateIndex(index.toString())
+    }
+
+    function getText() {
+        return stateHistory[Number.parseInt(stateIndex)];
+    }
 
     // function getText(): string {
     //     return lines.join('\n');
@@ -38,7 +77,7 @@ export const useNotepad = () => {
     // }
 
     //return [text, getText, setText, setLines] as [string, typeof getText, typeof setText, typeof setLines];
-    return [text, setText, title, setTitle, options, setOptions] as [string, typeof setText, string, typeof setTitle, typeof options, typeof setOptions];
+    return [getText, historyAwareSetText, title, setTitle, options, setOptions, stateHistory, stateIndex, setStateIndexNumeric] as [typeof getText, typeof historyAwareSetText, string, typeof setTitle, typeof options, typeof setOptions, typeof stateHistory, typeof stateIndex, typeof setStateIndexNumeric];
 }
 
 export interface NotepadOptions {
