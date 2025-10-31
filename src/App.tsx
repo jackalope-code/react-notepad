@@ -20,7 +20,7 @@ const TitleInput = styled.input`
 const tempOptions = {text: {notepadWrap: true}};
 
 function App() {
-    const [text, setText, title, setTitle, options, _] = useNotepad();
+    const [getText, setText, title, setTitle, options, _, stateHistory, stateIndex, setStateIndex] = useNotepad();
     const [optionsObj, setOptionsObj] = useState<NotepadOptions>(tempOptions)
     useEffect(() => {
       try {
@@ -41,6 +41,15 @@ function App() {
       }
     }
 
+    // TODO: TYPES
+    function handleUndoClicked(e: any) {
+      setStateIndex(Math.max(0, Number.parseInt(stateIndex) -1))
+    }
+
+    function handleRedoClicked(e: any) {
+      setStateIndex(Math.min(stateHistory.length, Number.parseInt(stateIndex) + 1))
+    }
+
   return (
     <>
       <NavBar>
@@ -50,12 +59,12 @@ function App() {
       <div className="toolbar">
         <input type="checkbox" name="input-toolbar-wrap-text" checked={optionsObj?.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>
         <label htmlFor="input-toolbar-wrap-text">Wrap text</label>
-        
-        <label htmlFor="input-toolbar-">Input</label>
+        <button onClick={handleUndoClicked}>Undo</button>
+        <button onClick={handleRedoClicked}>Redo</button>
       </div>
       <TitleInput className="title" type="text" onChange={(e) => setTitle(e.currentTarget.value)} value={title} />
         {/* TODO Add a check on JSON parsing */}
-      <Notepad text={text} setText={setText} options={optionsObj}></Notepad>
+      <Notepad text={getText()} setText={setText} options={optionsObj}></Notepad>
       {/* <Notepad text={text} setText={setText} options={{text: {notepadWrap: true}}}></Notepad> */}
       <Footer></Footer>
     </>
