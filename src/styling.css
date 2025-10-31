@@ -41,7 +41,7 @@ textarea {
         display: none;
     }
     textarea {
-        height: 60dvh;
+        height: 80dvh !important;
     }
 }
 
