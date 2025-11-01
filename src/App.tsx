@@ -5,6 +5,7 @@ import Notepad, { useNotepad, type NotepadOptions } from './Notepad'
 import { useEffect, useState, type ChangeEvent } from 'react';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
+import { faRotateLeft, faRotateRight } from '@fortawesome/free-solid-svg-icons';
 
 const TitleInput = styled.input`
   border: none;
@@ -20,7 +21,7 @@ const TitleInput = styled.input`
 const tempOptions = {text: {notepadWrap: true}};
 
 function App() {
-    const [getText, setText, title, setTitle, options, _, stateHistory, stateIndex, setStateIndex] = useNotepad();
+    const [text, setText, title, setTitle, options, _, stateHistory, stateIndex, setStateIndex] = useNotepad();
     const [optionsObj, setOptionsObj] = useState<NotepadOptions>(tempOptions)
     useEffect(() => {
       try {
@@ -43,11 +44,11 @@ function App() {
 
     // TODO: TYPES
     function handleUndoClicked(e: any) {
-      setStateIndex(Math.max(0, Number.parseInt(stateIndex) -1))
+      setStateIndex(Math.max(0, stateIndex-1))
     }
 
     function handleRedoClicked(e: any) {
-      setStateIndex(Math.min(stateHistory.length, Number.parseInt(stateIndex) + 1))
+      setStateIndex(Math.min(stateHistory.length, stateIndex + 1))
     }
 
   return (
@@ -57,14 +58,14 @@ function App() {
           <a href="https://github.com/jackalope-code/react-notepad"><FontAwesomeIcon icon={faGithub} className="icon"/></a>
       </NavBar>
       <div className="toolbar">
+        <button onClick={handleUndoClicked}><FontAwesomeIcon icon={faRotateLeft} aria-details='Undo'/></button>
+        <button onClick={handleRedoClicked}><FontAwesomeIcon icon={faRotateRight} aria-details='Redo' /></button>
         <input type="checkbox" name="input-toolbar-wrap-text" checked={optionsObj?.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>
         <label htmlFor="input-toolbar-wrap-text">Wrap text</label>
-        <button onClick={handleUndoClicked}>Undo</button>
-        <button onClick={handleRedoClicked}>Redo</button>
       </div>
       <TitleInput className="title" type="text" onChange={(e) => setTitle(e.currentTarget.value)} value={title} />
         {/* TODO Add a check on JSON parsing */}
-      <Notepad text={getText()} setText={setText} options={optionsObj}></Notepad>
+      <Notepad text={text} setText={setText} options={optionsObj}></Notepad>
       {/* <Notepad text={text} setText={setText} options={{text: {notepadWrap: true}}}></Notepad> */}
       <Footer></Footer>
     </>
