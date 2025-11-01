@@ -21,10 +21,15 @@ textarea {
 }
 
 .icon:hover {
-    color: yellow;
+    color: rgb(0, 170, 227);
 }
 .toolbar {
     padding-left: 10px;
+}
+
+textarea:active {
+    outline: none;
+    outline-color: rgb(0, 170, 227)
 }
 
 @media print {
@@ -47,4 +52,19 @@ textarea {
 
 .icon {
     color: white;
+}
+
+button {
+    background-color: white;
+    border: 1px solid lightslategray;
+    border-radius: 50%;
+    margin: 3px;
+}
+
+button:active {
+    border-radius: 1px solid black;
+}
+
+button:hover {
+    background-color: rgb(0, 170, 227);
 }
