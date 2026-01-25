@@ -1,6 +1,6 @@
 # NotepadJS
 
-Bootstrapped with vite. This app is available at https://jackalope-code.github.io/notepadjs/
+Bootstrapped with vite. This app is available at https://jackalope-code.github.io/react-notepad/
 
 ## Technologies used
 * React + TypeScript + Vite
