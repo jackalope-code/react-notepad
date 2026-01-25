@@ -8,6 +8,9 @@ Bootstrapped with vite. This app is available at https://jackalope-code.github.i
 * Uses the VitePWA plugin to allow users to install the app as a PWA
 
 ## To-Do
+* Better navigation around edges
+* Store text as an array of lines
+* Undo/redo history
 * More Notepad features
   * Editor
     * Line numbers
