@@ -1,25 +1,29 @@
 import { useEffect, useState } from "react";
 
-// interface UseLocalStorageProps {
-//   keyName: string;
-//   defaultValue: any;
-// }
+function useLocalStorage<T>(
+  keyName: string,
+  defaultValue: T,
+  serialize: (value: T) => string,
+  parse: (raw: string) => T,
+): [T, (value: T) => void] {
+  const [state, setState] = useState<T>(defaultValue);
 
-function useLocalStorage(keyName: string, defaultValue: string) {
-  const [state, setState] = useState<string>(defaultValue);
   useEffect(() => {
-    const value = localStorage.getItem(keyName);
-    if(value === undefined || value === null) {
-      setStateAndLocalStorage(defaultValue);
+    const raw = localStorage.getItem(keyName);
+    if (raw === null || raw === undefined) {
+      localStorage.setItem(keyName, serialize(defaultValue));
     } else {
-      setState(value);
+      setState(parse(raw));
     }
-  }, [])
-  function setStateAndLocalStorage(value: string) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function setStateAndLocalStorage(value: T) {
     setState(value);
-    localStorage.setItem(keyName, value);
+    localStorage.setItem(keyName, serialize(value));
   }
-  return [state, setStateAndLocalStorage] as [string, typeof setStateAndLocalStorage]
-};
+
+  return [state, setStateAndLocalStorage];
+}
 
 export default useLocalStorage;
