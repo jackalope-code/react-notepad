@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useLocalStorage from './useLocalStorage';
 
@@ -66,5 +66,41 @@ describe('useLocalStorage', () => {
       useLocalStorage<string[]>(KEY, [], serialize, parseArr),
     );
     expect(result.current[0]).toEqual(['hello', 'world']);
+  });
+
+  describe('when localStorage.setItem throws (quota exceeded / private browsing)', () => {
+    let setItemSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('QuotaExceededError', 'QuotaExceededError');
+      });
+    });
+
+    afterEach(() => {
+      setItemSpy.mockRestore();
+    });
+
+    it('propagates the throw from the initial default-value write on mount rather than crashing silently', () => {
+      expect(() => {
+        renderHook(() => useLocalStorage(KEY, 'default', identity, parse));
+      }).toThrow();
+    });
+
+    it('propagates the throw from the setter instead of silently swallowing the persistence failure', () => {
+      setItemSpy.mockImplementationOnce(() => {}); // let the mount-time default write succeed
+      const { result } = renderHook(() =>
+        useLocalStorage(KEY, 'initial', identity, parse),
+      );
+
+      expect(() => {
+        act(() => result.current[1]('updated'));
+      }).toThrow();
+
+      // The throw happens before act() can flush the pending setState, so
+      // the in-memory React state is left at its prior value rather than
+      // silently appearing to succeed while persistence actually failed.
+      expect(result.current[0]).toBe('initial');
+    });
   });
 });

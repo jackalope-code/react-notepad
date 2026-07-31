@@ -26,7 +26,7 @@ const StyledTextArea = styled.textarea.withConfig({
     width: 100%;
     height: 100dvh;
     overflow-y: scroll;
-    overflow-x: ${(props) => (props.notepadWrap ? 'none;' : 'scroll;')};
+    overflow-x: ${(props) => (props.notepadWrap ? 'hidden' : 'scroll')};
     highlight-on-focus: true;
     highlight-color: lightgray;
     resize: none;
@@ -39,10 +39,11 @@ const StyledTextArea = styled.textarea.withConfig({
 export interface NotepadOptions {
   text: {
     notepadWrap: boolean;
+    showLineNumbers?: boolean;
   };
 }
 
-const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true } };
+const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true, showLineNumbers: false } };
 
 // ---------------------------------------------------------------------------
 // getCursorLine helper (exported for testing)
@@ -59,6 +60,29 @@ export function getCursorLine(lines: string[], cursorPos: number): number {
     if (cursorPos < pos) return i;
   }
   return lines.length - 1;
+}
+
+export interface CursorPosition {
+  line: number;
+  column: number;
+}
+
+/**
+ * Given a lines array and a raw textarea selectionStart offset, returns the
+ * 0-based { line, column } the cursor is on in a single pass over `lines`
+ * (rather than a separate getCursorLine call plus a second column scan).
+ */
+export function getCursorPosition(lines: string[], cursorPos: number): CursorPosition {
+  let pos = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const lineLength = lines[i].length;
+    if (cursorPos <= pos + lineLength) {
+      return { line: i, column: cursorPos - pos };
+    }
+    pos += lineLength + 1; // +1 for the '\n' after each line
+  }
+  const lastLine = lines.length - 1;
+  return { line: lastLine, column: lines[lastLine]?.length ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -147,38 +171,95 @@ interface NotepadProps {
   options: NotepadOptions;
 }
 
+const EditorRow = styled.div`
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 100dvh;
+`;
+
+const LineNumberGutter = styled.div`
+  flex: 0 0 auto;
+  padding: 0 8px;
+  overflow-y: hidden;
+  height: 100dvh;
+  text-align: right;
+  color: gray;
+  background-color: #f5f5f5;
+  border-right: 1px solid lightgray;
+  font-family: monospace;
+  white-space: pre;
+  user-select: none;
+`;
+
+const StatusBar = styled.div`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  background-color: #f0f0f0;
+  border-top: 1px solid lightgray;
+`;
+
 const Notepad = ({ lines, setLines, options }: NotepadProps) => {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  const [activeLine, setActiveLine] = useState<number | null>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
+  const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
 
   function handleTextChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
     const newLines = event.target.value.split('\n');
     const cursorLine = getCursorLine(newLines, event.target.selectionStart);
-    setActiveLine(cursorLine);
+    setCursorPosition(getCursorPosition(newLines, event.target.selectionStart));
     setLines(newLines, cursorLine);
   }
 
+  // Reads the cursor position from currentTarget.selectionStart. Bound to
+  // click/select/keyup/focus rather than mousedown: mousedown fires *before*
+  // the browser updates selectionStart for the new click location, which
+  // caused the known bug where a single click didn't update the displayed
+  // cursor position (it took a second click to "catch up").
   function handleCursorMove(
     event:
       | React.KeyboardEvent<HTMLTextAreaElement>
-      | React.MouseEvent<HTMLTextAreaElement>,
+      | React.MouseEvent<HTMLTextAreaElement>
+      | React.SyntheticEvent<HTMLTextAreaElement>,
   ) {
-    const cursorLine = getCursorLine(lines, event.currentTarget.selectionStart);
-    setActiveLine(cursorLine);
+    setCursorPosition(getCursorPosition(lines, event.currentTarget.selectionStart));
+  }
+
+  function handleScroll(event: React.UIEvent<HTMLTextAreaElement>) {
+    if (gutterRef.current) {
+      gutterRef.current.scrollTop = event.currentTarget.scrollTop;
+    }
   }
 
   return (
     <>
-      <div>Line {activeLine !== null ? activeLine + 1 : '—'}</div>
-      <StyledTextArea
-        ref={textAreaRef}
-        onKeyDown={handleCursorMove}
-        onMouseDown={handleCursorMove}
-        wrap={options.text.notepadWrap ? 'on' : 'off'}
-        notepadWrap={options.text.notepadWrap}
-        value={lines.join('\n')}
-        onChange={handleTextChange}
-      />
+      <EditorRow>
+        {options.text.showLineNumbers && (
+          <LineNumberGutter ref={gutterRef} aria-hidden="true" data-testid="line-number-gutter">
+            {lines.map((_, i) => `${i + 1}\n`)}
+          </LineNumberGutter>
+        )}
+        <StyledTextArea
+          ref={textAreaRef}
+          onKeyUp={handleCursorMove}
+          onClick={handleCursorMove}
+          onSelect={handleCursorMove}
+          onFocus={handleCursorMove}
+          onScroll={handleScroll}
+          wrap={options.text.notepadWrap ? 'on' : 'off'}
+          notepadWrap={options.text.notepadWrap}
+          value={lines.join('\n')}
+          onChange={handleTextChange}
+        />
+      </EditorRow>
+      <StatusBar>
+        {cursorPosition !== null
+          ? `Line ${cursorPosition.line + 1}, Col ${cursorPosition.column + 1}`
+          : 'Line —, Col —'}
+      </StatusBar>
     </>
   );
 };

@@ -123,4 +123,74 @@ describe('useNotepad', () => {
     const { result } = renderHook(() => useNotepad());
     expect(result.current.options.text.notepadWrap).toBe(false);
   });
+
+  it('rapid undo past the start of history repeatedly returns null and stays at the initial state', () => {
+    const { result } = renderHook(() => useNotepad());
+    act(() => result.current.setLines(['a'], 0));
+    act(() => { result.current.undo(); });
+    let results: (number | null)[] = [];
+    act(() => {
+      results = [result.current.undo(), result.current.undo(), result.current.undo()];
+    });
+    expect(results).toEqual([null, null, null]);
+    expect(result.current.lines).toEqual(['']);
+  });
+
+  it('rapid redo past the end of history repeatedly returns null and stays at the latest state', () => {
+    const { result } = renderHook(() => useNotepad());
+    act(() => result.current.setLines(['a'], 0));
+    let results: (number | null)[] = [];
+    act(() => {
+      results = [result.current.redo(), result.current.redo(), result.current.redo()];
+    });
+    expect(results).toEqual([null, null, null]);
+    expect(result.current.lines).toEqual(['a']);
+  });
+
+  it('handles a long chain of sequential edits with full undo-to-start and full redo-to-end', () => {
+    const { result } = renderHook(() => useNotepad());
+    const steps = Array.from({ length: 12 }, (_, i) => `step${i}`);
+
+    for (const step of steps) {
+      act(() => result.current.setLines([step], 0));
+    }
+    expect(result.current.stateHistory).toHaveLength(12);
+    expect(result.current.stateIndex).toBe(11);
+    expect(result.current.lines).toEqual(['step11']);
+
+    for (let i = 0; i < 12; i++) {
+      act(() => { result.current.undo(); });
+    }
+    expect(result.current.lines).toEqual(['']);
+    expect(result.current.stateIndex).toBe(-1);
+
+    for (let i = 0; i < 12; i++) {
+      act(() => { result.current.redo(); });
+    }
+    expect(result.current.lines).toEqual(['step11']);
+    expect(result.current.stateIndex).toBe(11);
+    // history itself is untouched by traversal, only the index moves
+    expect(result.current.stateHistory).toHaveLength(12);
+  });
+
+  it('recovers to a blank document when localStorage text is corrupted JSON-looking garbage', () => {
+    localStorage.setItem('react-notepad-text', '{not valid json at all');
+    const { result } = renderHook(() => useNotepad());
+    // parseTextLines falls through to v1 plain-text handling for anything that
+    // fails JSON.parse, so the raw string itself becomes the (single) line.
+    expect(result.current.lines).toEqual(['{not valid json at all']);
+  });
+
+  it('recovers to default options when localStorage options is corrupted JSON', () => {
+    localStorage.setItem('react-notepad-options', '{not valid json');
+    const { result } = renderHook(() => useNotepad());
+    expect(result.current.options).toEqual({ text: { notepadWrap: true } });
+  });
+
+  it('recovers to default title when localStorage title JSON has version 2 but missing title field', () => {
+    localStorage.setItem('react-notepad-title', JSON.stringify({ version: 2 }));
+    const { result } = renderHook(() => useNotepad());
+    // falls through to v1 handling: raw string (the JSON text itself) becomes the title
+    expect(result.current.title).toBe(JSON.stringify({ version: 2 }));
+  });
 });
