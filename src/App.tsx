@@ -1,156 +1,34 @@
-import styled from 'styled-components';
-import Footer from './Footer'
-import NavBar from './NavBar'
-import Notepad from './Notepad'
-import TabBar from './TabBar';
-import NewDocumentDialog from './NewDocumentDialog';
-import ExportDialog from './ExportDialog';
+import { HashRouter, Routes, Route } from 'react-router-dom';
+import MainView from './MainView';
+import DocumentSettings from './DocumentSettings';
 import { useWorkspace } from './useWorkspace';
-import { useState, type ChangeEvent } from 'react';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import { faGithub } from '@fortawesome/free-brands-svg-icons';
-import { faRotateLeft, faRotateRight, faFileExport } from '@fortawesome/free-solid-svg-icons';
 
-const TitleInput = styled.input`
-  border: none;
-  display: inline;
-  font-family: inherit;
-  font-size: inherit;
-  padding: none;
-  width: auto;
-  font-size: 1.5rem;
-  font-weight: 600;
-`;
-
-function downloadTextFile(filename: string, content: string) {
-  const blob = new Blob([content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
+// HashRouter (rather than BrowserRouter) is used because this app is
+// deployed as a static site to GitHub Pages under a subpath (base:
+// '/react-notepad/', see vite.config.ts) with no server-side SPA fallback
+// (no custom 404.html rewrite configured) — a BrowserRouter path like
+// /react-notepad/settings/:id would 404 on a hard refresh or direct link,
+// whereas a HashRouter path never leaves the client, so it always resolves.
+//
+// useWorkspace() is instantiated once here and passed down to both routes
+// rather than each route calling it independently: since all writes go
+// through a *debounced* persist (see useWorkspace.ts), two separate hook
+// instances race on navigation — e.g. Settings could `navigate('/')` before
+// its debounced write flushes to IndexedDB, and MainView's independent
+// instance would then reload the stale pre-toggle state from storage. A
+// single shared instance has no such race, and also avoids an unnecessary
+// full workspace reload (loading flash) every time the user opens Settings.
 function App() {
-    const {
-      loading,
-      documents,
-      activeDocumentId,
-      setActiveDocumentId,
-      addDocument,
-      closeDocument,
-      setLines,
-      setTitle,
-      setOptions,
-      getHistory,
-      undo,
-      redo,
-    } = useWorkspace();
-
-    const [newDocDialogOpen, setNewDocDialogOpen] = useState(false);
-    const [exportDialogOpen, setExportDialogOpen] = useState(false);
-
-    const activeDocument = documents.find((doc) => doc.id === activeDocumentId);
-
-    if (loading || !activeDocument) {
-      return (
-        <>
-          <NavBar>
-            <span>react-notepad</span>
-            <a href="https://github.com/jackalope-code/react-notepad"><FontAwesomeIcon icon={faGithub} className="icon"/></a>
-          </NavBar>
-          <div className="toolbar">Loading…</div>
-        </>
-      );
-    }
-
-    const { stateHistory, stateIndex } = getHistory(activeDocument.id);
-    const canUndo = stateIndex >= 0;
-    const canRedo = stateIndex < stateHistory.length - 1;
-
-    function handleOptionChanged(optionTarget: string, e: ChangeEvent<HTMLInputElement>) {
-      switch(optionTarget) {
-        case 'options.text.notepadWrap':
-          setOptions(activeDocument!.id, {
-            ...activeDocument!.options,
-            text: { ...activeDocument!.options.text, notepadWrap: e.currentTarget.checked },
-          });
-          break;
-        case 'options.text.showLineNumbers':
-          setOptions(activeDocument!.id, {
-            ...activeDocument!.options,
-            text: { ...activeDocument!.options.text, showLineNumbers: e.currentTarget.checked },
-          });
-          break;
-      }
-    }
-
-    function handleUndoClicked() {
-      undo(activeDocument!.id);
-    }
-
-    function handleRedoClicked() {
-      redo(activeDocument!.id);
-    }
-
-    function handleExport(extension: string) {
-      downloadTextFile(`${activeDocument!.title}.${extension}`, activeDocument!.lines.join('\n'));
-      setExportDialogOpen(false);
-    }
+  const workspace = useWorkspace();
 
   return (
-    <>
-      <NavBar>
-          <span>react-notepad</span>
-          <a href="https://github.com/jackalope-code/react-notepad"><FontAwesomeIcon icon={faGithub} className="icon"/></a>
-      </NavBar>
-      <TabBar
-        documents={documents}
-        activeDocumentId={activeDocument.id}
-        onSelect={setActiveDocumentId}
-        onClose={closeDocument}
-        onAddClick={() => setNewDocDialogOpen(true)}
-      />
-      <div className="toolbar">
-        <button onClick={handleUndoClicked} disabled={!canUndo} aria-label="Undo">
-          <FontAwesomeIcon icon={faRotateLeft} /> Undo
-        </button>
-        <button onClick={handleRedoClicked} disabled={!canRedo} aria-label="Redo">
-          <FontAwesomeIcon icon={faRotateRight} /> Redo
-        </button>
-        <input id="input-toolbar-wrap-text" type="checkbox" name="input-toolbar-wrap-text" checked={activeDocument.options.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>
-        <label htmlFor="input-toolbar-wrap-text">Wrap text</label>
-        <input id="input-toolbar-line-numbers" type="checkbox" name="input-toolbar-line-numbers" checked={!!activeDocument.options.text.showLineNumbers} onChange={(e) => handleOptionChanged("options.text.showLineNumbers", e)}/>
-        <label htmlFor="input-toolbar-line-numbers">Line numbers</label>
-        <button onClick={() => setExportDialogOpen(true)} aria-label="Save as file">
-          <FontAwesomeIcon icon={faFileExport} /> Save as file
-        </button>
-      </div>
-      <TitleInput className="title" type="text" onChange={(e) => setTitle(activeDocument!.id, e.currentTarget.value)} value={activeDocument.title} />
-      <Notepad
-        lines={activeDocument.lines}
-        setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
-        options={activeDocument.options}
-      />
-      <Footer />
-      <NewDocumentDialog
-        open={newDocDialogOpen}
-        onClose={() => setNewDocDialogOpen(false)}
-        onCreate={(title) => {
-          addDocument(title);
-          setNewDocDialogOpen(false);
-        }}
-      />
-      <ExportDialog
-        open={exportDialogOpen}
-        onClose={() => setExportDialogOpen(false)}
-        onExport={handleExport}
-      />
-    </>
-  )
+    <HashRouter>
+      <Routes>
+        <Route path="/" element={<MainView workspace={workspace} />} />
+        <Route path="/settings/:documentId" element={<DocumentSettings workspace={workspace} />} />
+      </Routes>
+    </HashRouter>
+  );
 }
 
 export default App

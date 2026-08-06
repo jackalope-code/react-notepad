@@ -7,6 +7,7 @@ import App from './App';
 beforeEach(() => {
   localStorage.clear();
   globalThis.indexedDB = new IDBFactory();
+  window.location.hash = '';
 });
 
 async function renderApp() {
@@ -118,10 +119,14 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
 
-    expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
+    // The new document defaults to markdownEnabled: true, so it renders
+    // MarkdownNotepad (a TipTap contenteditable) instead of a plain textarea.
+    expect(document.querySelector('textarea')).not.toBeInTheDocument();
+    expect(document.querySelector('.tiptap')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Title'));
     expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe('first doc content');
+    expect(document.querySelector('.tiptap')).not.toBeInTheDocument();
   });
 
   it('closing a tab removes it and cannot remove the last remaining tab', async () => {
@@ -173,5 +178,50 @@ describe('App', () => {
 
     expect(clickSpy).toHaveBeenCalled();
     vi.restoreAllMocks();
+  });
+
+  it('clicking the settings gear on the active tab navigates to its settings page', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings for Title' }));
+    expect(await screen.findByText('Live Markdown Rendering')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Settings for "Title"' })).toBeInTheDocument();
+  });
+
+  it('Back on the settings page returns to the main view without persisting the toggle', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings for Title' }));
+    const checkbox = await screen.findByLabelText('Live Markdown Rendering') as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    fireEvent.click(checkbox);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.getByRole('tablist')).toBeInTheDocument());
+    // Discarded — the document should still be the plain-textarea editor.
+    expect(document.querySelector('textarea')).toBeInTheDocument();
+    expect(document.querySelector('.tiptap')).not.toBeInTheDocument();
+  });
+
+  it('Save on the settings page persists the Live Markdown Rendering toggle and swaps the editor', async () => {
+    await renderApp();
+    expect(document.querySelector('textarea')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings for Title' }));
+    const checkbox = await screen.findByLabelText('Live Markdown Rendering') as HTMLInputElement;
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.getByRole('tablist')).toBeInTheDocument());
+    expect(document.querySelector('textarea')).not.toBeInTheDocument();
+    expect(document.querySelector('.tiptap')).toBeInTheDocument();
+  });
+
+  it('navigating to a settings route for an unknown document id redirects to the main view', async () => {
+    await renderApp();
+    act(() => {
+      window.location.hash = '#/settings/does-not-exist';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    await waitFor(() => expect(screen.getByRole('tablist')).toBeInTheDocument());
+    expect(screen.queryByText('Live Markdown Rendering')).not.toBeInTheDocument();
   });
 });

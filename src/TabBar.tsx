@@ -1,5 +1,7 @@
 import styled from 'styled-components';
 import type { StoredDocumentV3 } from './utils/notepadTypes';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGear } from '@fortawesome/free-solid-svg-icons';
 
 interface TabBarProps {
   documents: StoredDocumentV3[];
@@ -7,6 +9,7 @@ interface TabBarProps {
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onAddClick: () => void;
+  onSettingsClick: (id: string) => void;
 }
 
 const TabBarContainer = styled.div`
@@ -41,11 +44,24 @@ const CloseButton = styled.button`
   font-size: 0.8rem;
 `;
 
+const SettingsButton = styled.button`
+  border: none;
+  background: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+  font-size: 0.75rem;
+  color: inherit;
+`;
+
 const AddButton = styled.button`
   margin-left: 4px;
 `;
 
-function TabBar({ documents, activeDocumentId, onSelect, onClose, onAddClick }: TabBarProps) {
+function TabBar({ documents, activeDocumentId, onSelect, onClose, onAddClick, onSettingsClick }: TabBarProps) {
   return (
     <TabBarContainer role="tablist">
       {documents.map((doc) => (
@@ -57,6 +73,18 @@ function TabBar({ documents, activeDocumentId, onSelect, onClose, onAddClick }: 
           onClick={() => onSelect(doc.id)}
         >
           <span>{doc.title || 'Untitled'}</span>
+          {doc.id === activeDocumentId && (
+            <SettingsButton
+              type="button"
+              aria-label={`Settings for ${doc.title || 'Untitled'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSettingsClick(doc.id);
+              }}
+            >
+              <FontAwesomeIcon icon={faGear} />
+            </SettingsButton>
+          )}
           {documents.length > 1 && (
             <CloseButton
               type="button"

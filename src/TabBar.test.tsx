@@ -23,6 +23,7 @@ describe('TabBar', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
       />
     );
     const tabs = screen.getAllByRole('tab');
@@ -42,6 +43,7 @@ describe('TabBar', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
       />
     );
     expect(screen.getByText('Untitled')).toBeInTheDocument();
@@ -57,6 +59,7 @@ describe('TabBar', () => {
         onSelect={onSelect}
         onClose={vi.fn()}
         onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
       />
     );
     fireEvent.click(screen.getByText('Beta'));
@@ -72,6 +75,7 @@ describe('TabBar', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
       />
     );
     expect(screen.queryByRole('button', { name: /Close/ })).not.toBeInTheDocument();
@@ -88,6 +92,7 @@ describe('TabBar', () => {
         onSelect={onSelect}
         onClose={onClose}
         onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Close Beta' }));
@@ -105,9 +110,30 @@ describe('TabBar', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         onAddClick={onAddClick}
+        onSettingsClick={vi.fn()}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'New document' }));
     expect(onAddClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a settings button only for the active tab and calls onSettingsClick without triggering onSelect', () => {
+    const onSelect = vi.fn();
+    const onSettingsClick = vi.fn();
+    const docs = [makeDoc('1', 'Alpha'), makeDoc('2', 'Beta')];
+    render(
+      <TabBar
+        documents={docs}
+        activeDocumentId="2"
+        onSelect={onSelect}
+        onClose={vi.fn()}
+        onAddClick={vi.fn()}
+        onSettingsClick={onSettingsClick}
+      />
+    );
+    expect(screen.queryByRole('button', { name: 'Settings for Alpha' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings for Beta' }));
+    expect(onSettingsClick).toHaveBeenCalledWith('2');
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

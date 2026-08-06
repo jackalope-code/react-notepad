@@ -25,3 +25,6 @@ Bootstrapped with vite. This app is available at https://jackalope-code.github.i
 * Cloud storage
   * User accounts
 * Use encryption?
+
+## Known perf optimizations to revisit
+* `MarkdownNotepad` (TipTap/ProseMirror) adds a >500kB chunk to the production build. Since it's only needed for documents with `markdownEnabled: true`, it's a good candidate for `React.lazy`/dynamic `import()` code-splitting in `App.tsx` so the plain-textarea `Notepad` path doesn't pay for it upfront.
