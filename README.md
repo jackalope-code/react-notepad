@@ -26,19 +26,19 @@ Bootstrapped with vite. This app is available at https://jackalope-code.github.i
 
 ## To-Do
 * Better navigation around edges
-~~* Store text as an array of lines~~
-~~* Undo/redo history~~
-~~* Line numbers~~
-  * Editor
-    * Richer documents supporting mixed fonts and with e.g. multimedia, drawing support, markdown, LaTeX, charts)
-      * Font size
-      * Font style
-      * Permanent highlighting (and the ability to toggle off all styles for e.g. pasting code)
-      * Images
-      * Drawing support
-      * LaTeX
-      ~~ Markdown formatting~~
-      * Charts
+* ~~Store text as an array of lines~~
+* ~~Undo/redo history~~
+* ~~Line numbers~~
+* Editor
+  * Richer documents supporting mixed fonts and with e.g. multimedia, drawing support, markdown, LaTeX, charts)
+    * Font size
+    * Font style
+    * Permanent highlighting (and the ability to toggle off all styles for e.g. pasting code)
+    * Images
+    * Drawing support
+    * LaTeX
+    * ~~Markdown formatting~~
+    * Charts
 * Find/Replace with regex
 * Better Notepad abstractions (Use a context with Notepad.js?)
   * Allow for notes to be exposed as an API with user authentication
