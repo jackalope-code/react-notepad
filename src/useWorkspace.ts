@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getWorkspace, putWorkspace } from './utils/indexedDbStore';
 import {
-  computeDelta,
-  applyDelta,
-  revertDelta,
   loadWorkspace,
   type StoredWorkspaceV3,
   type StoredDocumentV3,
   type HistoryEntry,
   type LegacyLocalStorageSnapshot,
 } from './utils/notepadTypes';
+import { createTextBuffer } from './utils/textBuffer';
 import { getCursorLine, type NotepadOptions } from './Notepad';
 import { debounce } from './utils/functions';
 
@@ -223,7 +221,7 @@ export const useWorkspace = () => {
       if (!doc) return;
 
       const prevCursorLine = getCursorLine(doc.lines, 0);
-      const delta = computeDelta(doc.lines, newLines, prevCursorLine, toCursorLine);
+      const delta = createTextBuffer(doc.lines).computeDelta(newLines, prevCursorLine, toCursorLine);
 
       updateDocument(id, (d) => ({ ...d, lines: newLines }));
 
@@ -247,7 +245,7 @@ export const useWorkspace = () => {
       const doc = documentsRef.current.find((d) => d.id === id);
       if (!doc) return null;
 
-      const reverted = revertDelta(doc.lines, entry);
+      const reverted = createTextBuffer(doc.lines).revertDelta(entry).getLines();
       updateDocument(id, (d) => ({ ...d, lines: reverted }));
       commitHistory({
         ...historyRef.current,
@@ -267,7 +265,7 @@ export const useWorkspace = () => {
       const doc = documentsRef.current.find((d) => d.id === id);
       if (!doc) return null;
 
-      const applied = applyDelta(doc.lines, entry);
+      const applied = createTextBuffer(doc.lines).applyDelta(entry).getLines();
       updateDocument(id, (d) => ({ ...d, lines: applied }));
       commitHistory({
         ...historyRef.current,

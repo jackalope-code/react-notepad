@@ -2,7 +2,9 @@ import styled from 'styled-components';
 import Footer from './Footer'
 import NavBar from './NavBar'
 import Notepad from './Notepad'
+import VirtualizedNotepad from './VirtualizedNotepad'
 import MarkdownNotepad from './MarkdownNotepad'
+import { USE_VIRTUALIZED_EDITOR } from './utils/featureFlags'
 import TabBar from './TabBar';
 import NewDocumentDialog from './NewDocumentDialog';
 import ExportDialog from './ExportDialog';
@@ -148,6 +150,12 @@ function MainView({ workspace }: MainViewProps) {
       <TitleInput className="title" type="text" onChange={(e) => setTitle(activeDocument!.id, e.currentTarget.value)} value={activeDocument.title} />
       {activeDocument.markdownEnabled ? (
         <MarkdownNotepad
+          lines={activeDocument.lines}
+          setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
+          options={activeDocument.options}
+        />
+      ) : USE_VIRTUALIZED_EDITOR ? (
+        <VirtualizedNotepad
           lines={activeDocument.lines}
           setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
           options={activeDocument.options}
