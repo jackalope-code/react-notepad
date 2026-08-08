@@ -37,7 +37,7 @@ Bootstrapped with vite. This app is available at https://jackalope-code.github.i
       * Images
       * Drawing support
       * LaTeX
-      ~~* Markdown formatting~~
+      ~~ Markdown formatting~~
       * Charts
 * Find/Replace with regex
 * Better Notepad abstractions (Use a context with Notepad.js?)
