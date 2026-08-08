@@ -44,4 +44,3 @@ Bootstrapped with vite. This app is available at https://jackalope-code.github.i
   * Allow for notes to be exposed as an API with user authentication
 * Cloud storage
   * User accounts
-* Use encryption?
