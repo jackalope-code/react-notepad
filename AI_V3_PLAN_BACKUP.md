@@ -1,6 +1,8 @@
 # V3 Plan Backup (Resume Point)
 
 > Backup of the originally approved plan, kept at the repo root so this context can be recovered if the session/workspace is interrupted mid-implementation. Track progress against the phase list below; resume at the first incomplete phase.
+>
+> **Do not reference personal user directories, usernames, or absolute local file paths anywhere in this document.** Use repo-relative paths only (e.g. `src/Notepad.tsx:68-106`, not `C:\Users\<name>\...\src\Notepad.tsx:68-106`).
 
 # Multi-Document v3 Storage Redesign: IndexedDB, Chained Migration, Export-Time Extensions, Markdown Rendering, and Reliability/Perf Test Coverage
 
@@ -130,7 +132,7 @@ function loadWorkspace(legacyKeys: LegacyLocalStorageSnapshot): StoredWorkspaceV
 - [~] Word-wrap/visual-row gutter desync risk documented as a known limitation, not resolved.
 - [ ] TipTap cursor-position adaptation deferred to Phase 6.
 
-## Phase 6 — Live Markdown Rendering (TipTap) `[DONE - NEEDS TESTING]`
+## Phase 6 — Live Markdown Rendering (TipTap) `[DONE - NEEDS TESTING]` — superseded by Phase 8.5
 
 - [x] Added `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `tiptap-markdown` (v3-compatible). `npm run build` succeeds (one non-blocking >500kB chunk warning from ProseMirror, not addressed).
 - [x] New `MarkdownNotepad.tsx`: TipTap `EditorContent` + `StarterKit`/`Markdown` extensions; `onUpdate` calls `editor.storage.markdown.getMarkdown()` (via a typed helper since `tiptap-markdown` doesn't augment `Storage`) and splits back into `lines`, calling the same `setLines(lines, cursorLine)` prop as `Notepad` — reuses `useWorkspace`'s existing per-document persistence/undo-redo, no changes needed there.
@@ -164,6 +166,23 @@ function loadWorkspace(legacyKeys: LegacyLocalStorageSnapshot): StoredWorkspaceV
 - [ ] `CursorStatus.test.tsx` / `Notepad.component.test.tsx` additions: bottom-left status bar shows correct `Line {n}, Col {m}` across typing, arrow-key navigation, and mouse clicks — including a regression test that a **single** click updates the cursor position without requiring a second click.
 - [ ] `LineNumberGutter.test.tsx`: toggling the global "Line numbers" checkbox shows/hides the gutter; gutter text has `user-select: none` and is excluded from any copy/selection of the textarea content; gutter count matches `lines.length` and updates as lines are added/removed.
 - [ ] Enforce coverage threshold (from Phase 1 tooling) now against the full new `src/utils/**` surface, including the new migration/IndexedDB files.
+
+## Phase 8.5 — Custom Markdown Overlay Editor (Replaces TipTap) `[DONE]`
+
+Replaces Phase 6's TipTap/ProseMirror `MarkdownNotepad` with a fully custom "visible-syntax overlay" editor, at the user's explicit request to not depend on a pre-built rich-text editor. Reuses the Phase 13 `TextBuffer`/`VirtualizedNotepad` windowing architecture instead of a `contentEditable` document model.
+
+- [x] New `src/utils/markdownTokenizer.ts`: wraps `marked.lexer()` and recovers exact `{start, end}` source character offsets per styled span (headings, bold/italic/strikethrough, inline code, fenced code blocks, links, lists, blockquotes) — `marked`'s lexer is designed to emit HTML, not offsets, so this is custom offset-recovery glue, not just a lexer call. Defensive by design: any lexing failure falls back to fully unstyled plain text rather than corrupting/hiding content.
+- [x] New `src/MarkdownOverlayNotepad.tsx`: a real `<textarea>` (transparent text, visible native caret) with a `pointer-events: none` styled `<div>` overlay on top showing the same text with markdown syntax highlighted. Not `contentEditable` — `lines: string[]` is always the literal on-screen text, zero serialization step (unlike TipTap, which had to convert its ProseMirror doc to/from a markdown string on every change).
+- [x] Reuses `VirtualizedNotepad`'s `WINDOW_LINES`/`OVERSCAN_LINES`/`useMeasuredLineHeight` windowing directly — markdown-enabled documents now get the same large-document windowing behavior as plain-text ones, which TipTap never had (Phase 13 was explicitly scoped to plain-text `Notepad` only).
+- [x] `MainView.tsx` renders `MarkdownOverlayNotepad` instead of `MarkdownNotepad` when `activeDocument.markdownEnabled`. Removed `MarkdownNotepad.tsx`/`MarkdownNotepad.test.tsx`/`getTiptapCursorPosition` entirely (not kept behind a flag — full replacement, per explicit request). Removed `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `tiptap-markdown` from `package.json`.
+- [x] **Bug found post-ship and fixed**: an early version scaled heading text via `font-size` in the overlay. Since the overlay must stay character-width-aligned with the invisible monospace textarea underneath it for the caret to track correctly, this desynced overlay glyphs from the real caret position — the caret was actually at the true end of the line, just visually hidden under the wider heading text, making it appear "stuck." Fixed by never changing `font-size`/letter-spacing for any class that can appear on the actively-edited line.
+- [x] **Active-line / inactive-line rendering split**, added to reconcile "headings should look bigger" with "the editor must stay accurate while typing": the line the cursor currently occupies renders in plain, accurate form (normal size, raw `#`/`**`/`*`/list markers visible); every other line renders in a stylized form (headings enlarged, markers hidden, list bullets replaced with a real `•` glyph). This is the standard Typora/Obsidian live-preview pattern and the only way to have both properties simultaneously without a real contentEditable document model.
+  - Heading enlargement on inactive lines uses CSS `transform: scale()`, **not** `font-size` — `transform` doesn't change the element's layout box width, so it can't desync the caret even on lines adjacent to the active one.
+  - **Known trade-off, not resolved**: `transform: scale()` also doesn't reflow layout *height*. `VirtualizedNotepad`'s windowing math assumes a uniform, fixed line height for every line (`useMeasuredLineHeight()` × line count) for scroll-position/sizer calculations. An enlarged inactive heading can therefore visually bleed into the line directly below it (a cosmetic overlap) without affecting scroll-position accuracy or virtualization correctness, which stay exact. A pixel-perfect fix would require variable-row-height virtualization — a much larger architectural change — so this is accepted as-is, the same way Phase 5's word-wrap/gutter desync risk was accepted rather than solved.
+  - Markdown markers are hidden via `color: transparent !important` (not `display: none`), so the hidden character still reserves its layout width — required for the same alignment-safety reason.
+  - List bullet substitution (`•` for unordered `-`/`*`/`+`, left alone for ordered `1.` numbering) uses `visibility: hidden` + an absolutely-positioned `::before` pseudo-element, for the same width-preservation reason.
+- [x] Tests: `markdownTokenizer.test.ts` (38 tests — offset correctness per feature, nesting, round-trip/reconstruction safety, adversarial input, ATX heading closing-sequence markers, ordered-vs-bullet marker classification); `MarkdownOverlayNotepad.test.tsx` (22 tests — overlay/textarea text-content parity, windowing, className application, active/inactive-line reveal-hide behavior, heading-scale/bullet-glyph gating, no-transformation edits). Updated 3 stale `App.test.tsx` assertions that checked for TipTap's `.tiptap` DOM class.
+- [x] Confirmed: 358/358 tests pass, `tsc -b --noEmit` clean, `npm run build` succeeds.
 
 ## Phase 9 — Size-Tiered Performance & Memory Tests `[NOT STARTED]`
 
@@ -212,11 +231,12 @@ Reverses two original Non-Goals (rope rewrite, virtualized rendering), deliverin
 ## Flagged Risks (need acknowledgment, not blocking plan approval)
 
 - Rendering a 100MB–2GB document in a single native `<textarea>` will be slow/unresponsive in real browsers regardless of storage backend — this is a DOM/rendering limitation, not fixed by IndexedDB. This plan's perf tests cover the **storage/migration/edit-model** layer honestly at those sizes; making the live UI itself smooth at 2GB would require a virtualized/windowed editor (rope or line-windowing in the render layer), which remains a **non-goal** here per earlier scoping.
-- TipTap (`MarkdownNotepad`) is a `contentEditable`-based rich editor with its own DOM/virtual-doc overhead, generally **worse** than a plain `<textarea>` at multi-MB+ document sizes. The size-tiered perf tests in Phase 9 target the plain-text/`lines` model and IndexedDB, not the TipTap rendering path — markdown-enabled documents are not expected to be perf-tested at the 100MB/2GB tiers.
+- ~~TipTap (`MarkdownNotepad`) is a `contentEditable`-based rich editor with its own DOM/virtual-doc overhead, generally **worse** than a plain `<textarea>` at multi-MB+ document sizes.~~ Superseded by Phase 8.5 — TipTap was removed entirely in favor of `MarkdownOverlayNotepad`, a `<textarea>`-based overlay editor that reuses Phase 13's windowing, so markdown-enabled documents now get the same large-document virtualization as plain-text ones.
+- **(Phase 8.5)** `MarkdownOverlayNotepad`'s inactive-line heading enlargement uses CSS `transform: scale()`, which doesn't reflow layout height — an enlarged heading can visually bleed into the line directly below it. Doesn't affect scroll-position/virtualization correctness (those stay exact), purely a cosmetic overlap. A pixel-perfect fix would require variable-row-height virtualization, out of scope for now.
 
 ## Explicit Non-Goals
 
 - No File System Access API / live re-save-to-same-file (download-only export).
 - No virtualized/windowed `<textarea>` rendering for huge documents — perf tests validate the storage/migration/model layer, not live DOM editing at 2GB. *(Superseded by Phase 13: a virtualized editor (`VirtualizedNotepad.tsx`) is now implemented, behind `USE_VIRTUALIZED_EDITOR`.)*
 - No rope/piece-table rewrite of the in-memory editing model — `lines: string[]` + delta-based undo stays. *(Superseded by Phase 13: a rope-backed `TextBuffer` (`RopeBuffer`/`rope.ts`) is now implemented, behind `USE_ROPE_MODEL`, with `lines: string[]` remaining the on-disk format either way.)*
-- No perf/memory testing of the TipTap markdown rendering path at 100MB/2GB tiers (impractical for a rich-text DOM editor); markdown mode is scoped for typical note-sized documents.
+- No perf/memory testing of the markdown rendering path at 100MB/2GB tiers; markdown mode is scoped for typical note-sized documents. *(Note: since Phase 8.5, markdown documents use `MarkdownOverlayNotepad`, which reuses Phase 13's virtualization — this non-goal is less pressing than when it was written against TipTap, but still not formally perf-tested.)*

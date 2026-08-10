@@ -3,7 +3,7 @@ import Footer from './Footer'
 import NavBar from './NavBar'
 import Notepad from './Notepad'
 import VirtualizedNotepad from './VirtualizedNotepad'
-import MarkdownNotepad from './MarkdownNotepad'
+import MarkdownOverlayNotepad from './MarkdownOverlayNotepad'
 import { USE_VIRTUALIZED_EDITOR } from './utils/featureFlags'
 import TabBar from './TabBar';
 import NewDocumentDialog from './NewDocumentDialog';
@@ -150,7 +150,7 @@ function MainView({ workspace }: MainViewProps) {
       </div>
       <TitleInput className="title" type="text" onChange={(e) => setTitle(activeDocument!.id, e.currentTarget.value)} value={activeDocument.title} />
       {activeDocument.markdownEnabled ? (
-        <MarkdownNotepad
+        <MarkdownOverlayNotepad
           lines={activeDocument.lines}
           setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
           options={activeDocument.options}

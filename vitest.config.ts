@@ -10,7 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/utils/**', 'src/Notepad.tsx', 'src/MarkdownNotepad.tsx', 'src/App.tsx', 'src/MainView.tsx', 'src/DocumentSettings.tsx', 'src/useWorkspace.ts'],
+      include: ['src/utils/**', 'src/Notepad.tsx', 'src/MarkdownOverlayNotepad.tsx', 'src/App.tsx', 'src/MainView.tsx', 'src/DocumentSettings.tsx', 'src/useWorkspace.ts'],
       thresholds: {
         lines: 90,
         statements: 90,

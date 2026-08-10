@@ -120,13 +120,14 @@ describe('App', () => {
     await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
 
     // The new document defaults to markdownEnabled: true, so it renders
-    // MarkdownNotepad (a TipTap contenteditable) instead of a plain textarea.
-    expect(document.querySelector('textarea')).not.toBeInTheDocument();
-    expect(document.querySelector('.tiptap')).toBeInTheDocument();
+    // MarkdownOverlayNotepad (its own textarea + highlight overlay) instead
+    // of the plain-text VirtualizedNotepad/Notepad textarea.
+    expect(document.querySelector('[data-testid="virtualized-textarea"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Title'));
-    expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe('first doc content');
-    expect(document.querySelector('.tiptap')).not.toBeInTheDocument();
+    expect((document.querySelector('[data-testid="virtualized-textarea"]') as HTMLTextAreaElement).value).toBe('first doc content');
+    expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).not.toBeInTheDocument();
   });
 
   it('closing a tab removes it and cannot remove the last remaining tab', async () => {
@@ -197,8 +198,8 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     await waitFor(() => expect(screen.getByRole('tablist')).toBeInTheDocument());
     // Discarded — the document should still be the plain-textarea editor.
-    expect(document.querySelector('textarea')).toBeInTheDocument();
-    expect(document.querySelector('.tiptap')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-testid="virtualized-textarea"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).not.toBeInTheDocument();
   });
 
   it('Save on the settings page persists the Live Markdown Rendering toggle and swaps the editor', async () => {
@@ -211,8 +212,8 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(screen.getByRole('tablist')).toBeInTheDocument());
-    expect(document.querySelector('textarea')).not.toBeInTheDocument();
-    expect(document.querySelector('.tiptap')).toBeInTheDocument();
+    expect(document.querySelector('[data-testid="virtualized-textarea"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).toBeInTheDocument();
   });
 
   it('navigating to a settings route for an unknown document id redirects to the main view', async () => {

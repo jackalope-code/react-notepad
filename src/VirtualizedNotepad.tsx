@@ -220,5 +220,5 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
   );
 };
 
-export { WINDOW_LINES };
+export { WINDOW_LINES, OVERSCAN_LINES, useMeasuredLineHeight };
 export default VirtualizedNotepad;

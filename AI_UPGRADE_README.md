@@ -1,6 +1,8 @@
 # Upgrade Rationale: v3 Multi-Document Storage Redesign
 
 > **Living document.** This file is updated as the plan in `notepad-storage-multidoc-38c0f1.md` (Windsurf plans directory) actually ships, so it always reflects the real, current state of the codebase — not just the original intent. See `V3_PLAN_BACKUP.md` at the repo root for the full phase-by-phase plan and progress checklist.
+>
+> **Do not reference personal user directories, usernames, or absolute local file paths anywhere in this document.** Use repo-relative paths only (e.g. `src/Notepad.tsx`, not `C:\Users\<name>\...\src\Notepad.tsx`).
 
 ## Where we're at today
 
@@ -33,9 +35,20 @@ The sketch below was originally "not built in this upgrade." **Phase 13 supersed
 1. `src/utils/textBuffer.ts` defines a `TextBuffer` interface implemented by both `LinesBuffer` (wraps the original `lines: string[]` behavior exactly) and `RopeBuffer` (backed by the new `src/utils/rope.ts` `Rope` class — a custom balanced leaf/concat tree with O(log n) `insert`/`delete`). `computeDelta`/`applyDelta`/`revertDelta` in `src/utils/notepadTypes.ts` are unchanged; `useWorkspace.ts` now calls them through whichever `TextBuffer` `createTextBuffer()` selects, so undo/redo semantics are identical either way.
 2. `src/VirtualizedNotepad.tsx` is the windowed-rendering replacement for the `<textarea>` DOM element (rendering only a scroll-position-derived window of lines behind a real `<textarea>`, next to an invisible sizer element for correct scrollbar range). `MainView.tsx` renders it instead of `Notepad.tsx` when `USE_VIRTUALIZED_EDITOR` is true; `Notepad.tsx` remains the fallback and is unaffected when the flag is off.
 3. The persisted storage format is unaffected by either flag: `lines: string[]` stays the on-disk IndexedDB shape regardless — the rope is purely an in-memory representation, converted at the storage boundary.
-4. Scoped to plain-text `Notepad`/`VirtualizedNotepad` only; `MarkdownNotepad`/ProseMirror is unchanged by this phase.
+4. Scoped to plain-text `Notepad`/`VirtualizedNotepad` only at the time this phase shipped; `MarkdownNotepad`/ProseMirror was unchanged by this phase (see Phase 8.5 below, which replaced it and brought markdown documents onto the same windowing).
 
 See `V3_PLAN_BACKUP.md` Phase 13 for the full checklist and test coverage (rope fuzz/differential tests, shared `TextBuffer` conformance suite, flag-flip round-trip safety, and a flag-combination smoke matrix).
+
+## Markdown rendering: custom overlay editor replaces TipTap (Phase 8.5)
+
+The TipTap/ProseMirror `MarkdownNotepad` from Phase 6 was fully removed and replaced with a custom "visible-syntax overlay" editor, at explicit user request to avoid depending on a pre-built rich-text editor:
+
+1. `src/utils/markdownTokenizer.ts` wraps `marked.lexer()` and recovers exact source character offsets per styled span (`marked`'s lexer emits HTML by default, not offsets — this is custom glue code, not just a lexer call).
+2. `src/MarkdownOverlayNotepad.tsx` layers a `pointer-events: none` styled overlay `<div>` over a real, transparent `<textarea>` — not `contentEditable`. `lines: string[]` is always the literal on-screen text with zero serialization step, unlike TipTap which had to convert its ProseMirror doc to/from markdown on every change. It reuses `VirtualizedNotepad`'s windowing directly, so markdown documents now get the same large-document virtualization as plain-text ones — a real improvement over TipTap, which had no windowing at all and was flagged in the plan as generally worse than a plain `<textarea>` at multi-MB+ sizes.
+3. **Cursor-alignment constraint (the one hard rule of this architecture)**: every character in the overlay must stay exactly as wide as the corresponding character in the underlying monospace textarea, or the overlay desyncs from the real caret position. This was violated once (heading text scaled via `font-size`) and caused a real bug — the caret would appear "stuck" mid-word because the enlarged overlay glyphs no longer lined up with where the real (unscaled) caret actually was. Fixed by switching to CSS `transform: scale()` for visual enlargement, which doesn't affect layout width, combined with an **active-line / inactive-line split**: the line the cursor is currently on always renders at plain, accurate size with all markdown markers visible (for correct editing); every other line renders stylized (headings enlarged, `#`/`**`/`*`/list markers hidden, list bullets shown as a real `•`) — the standard Typora/Obsidian live-preview pattern.
+4. **Known, accepted trade-off**: `transform: scale()` enlarges glyphs visually but doesn't reflow layout *height*, and `VirtualizedNotepad`'s windowing assumes a uniform fixed line height for all lines. An enlarged inactive heading can therefore visually bleed into the line directly below it — a cosmetic overlap only; scroll-position/virtualization math stays exact. A pixel-perfect fix would need variable-row-height virtualization, a materially larger change, so this is accepted the same way Phase 5's word-wrap/gutter desync risk was accepted rather than solved.
+
+See `V3_PLAN_BACKUP.md` Phase 8.5 for the full checklist and test coverage.
 
 ## Current upgrade status
 
