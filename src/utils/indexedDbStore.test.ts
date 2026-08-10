@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { getWorkspace, putWorkspace } from './indexedDbStore';
@@ -52,5 +52,13 @@ describe('indexedDbStore', () => {
     await expect(getWorkspace()).rejects.toThrow();
     // restore for subsequent tests in this file
     globalThis.indexedDB = new IDBFactory();
+  });
+
+  it('putWorkspace rejects when the underlying write fails with a quota-exceeded error (parallel to the existing localStorage quota test)', async () => {
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    });
+    await expect(putWorkspace(workspace)).rejects.toThrow();
+    putSpy.mockRestore();
   });
 });

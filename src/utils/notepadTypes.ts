@@ -202,7 +202,7 @@ export interface LegacyLocalStorageSnapshot {
  * already structurally validated by `JSON.parse` + `Array.isArray` in
  * `parseTextLines`, so it's trusted as-is here.
  */
-function verifyTextMigrationIntegrity(rawText: string, lines: string[]): boolean {
+export function verifyTextMigrationIntegrity(rawText: string, lines: string[]): boolean {
   let isV2 = false;
   try {
     const parsed = JSON.parse(rawText);
@@ -244,7 +244,6 @@ export function migrateV1toV2(raw: LegacyLocalStorageSnapshot): StoredV2Bundle {
   const title = parseTitle(titleRaw);
   const options = parseOptions(optionsRaw);
 
-  /* v8 ignore next 6 -- unreachable via the current deterministic parseTextLines path; kept as defense-in-depth against future refactors */
   if (!verifyTextMigrationIntegrity(textRaw, lines)) {
     console.warn(
       'migrateV1toV2: text integrity check failed (line/char count mismatch); falling back to a blank document.',

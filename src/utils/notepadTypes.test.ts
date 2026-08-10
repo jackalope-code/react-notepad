@@ -12,6 +12,7 @@ import {
   migrateV1toV2,
   migrateV2toV3,
   loadWorkspace,
+  verifyTextMigrationIntegrity,
   type LegacyLocalStorageSnapshot,
   type StoredV2Bundle,
 } from './notepadTypes';
@@ -369,18 +370,47 @@ describe('migrateV1toV2', () => {
     });
   });
 
-  it('falls back to a blank document when the text integrity check fails', () => {
+  it('the integrity check accepts all realistic parseTextLines outputs (no false positives)', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    // parseTextLines is deterministic and can't actually desync from the
-    // integrity check under normal input, so we simulate a corrupt-migration
-    // scenario indirectly isn't possible without mocking parseTextLines.
-    // Instead, verify the integrity check accepts all realistic inputs and
-    // the warning path is reachable via a targeted unit test of the exported
-    // behavior: an empty raw string always produces [''] and passes.
     const bundle = migrateV1toV2({ textRaw: '', titleRaw: null, optionsRaw: null });
     expect(bundle.lines).toEqual(['']);
     expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// verifyTextMigrationIntegrity (direct unit tests of the corruption-detection
+// logic used by migrateV1toV2's fallback-to-blank-document path)
+// ---------------------------------------------------------------------------
+
+describe('verifyTextMigrationIntegrity', () => {
+  it('passes for a correctly split v1 plain-text migration', () => {
+    expect(verifyTextMigrationIntegrity('hello\nworld', ['hello', 'world'])).toBe(true);
+  });
+
+  it('passes for an empty v1 raw string producing [\'\']', () => {
+    expect(verifyTextMigrationIntegrity('', [''])).toBe(true);
+  });
+
+  it('always trusts v2 JSON input regardless of the lines argument', () => {
+    const rawV2 = JSON.stringify({ version: 2, lines: ['a', 'b'] });
+    expect(verifyTextMigrationIntegrity(rawV2, ['completely', 'different'])).toBe(true);
+  });
+
+  it('fails when a line was silently dropped (fewer lines than expected)', () => {
+    // 'a\nb\nc' should split into 3 lines; simulate a corrupted migration
+    // that truncated the last line.
+    expect(verifyTextMigrationIntegrity('a\nb\nc', ['a', 'b'])).toBe(false);
+  });
+
+  it('fails when a line was silently duplicated (more lines than expected)', () => {
+    expect(verifyTextMigrationIntegrity('a\nb', ['a', 'b', 'b'])).toBe(false);
+  });
+
+  it('fails when the total character count does not match despite equal line count', () => {
+    // Same number of lines, but content was truncated mid-line.
+    expect(verifyTextMigrationIntegrity('hello\nworld', ['hell', 'world'])).toBe(false);
   });
 });
 

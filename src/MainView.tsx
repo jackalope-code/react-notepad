@@ -8,6 +8,7 @@ import { USE_VIRTUALIZED_EDITOR } from './utils/featureFlags'
 import TabBar from './TabBar';
 import NewDocumentDialog from './NewDocumentDialog';
 import ExportDialog from './ExportDialog';
+import { buildExportFilename } from './utils/exportFilename';
 import type { useWorkspace } from './useWorkspace';
 import { useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -106,7 +107,7 @@ function MainView({ workspace }: MainViewProps) {
     }
 
     function handleExport(extension: string) {
-      downloadTextFile(`${activeDocument!.title}.${extension}`, activeDocument!.lines.join('\n'));
+      downloadTextFile(buildExportFilename(activeDocument!.title, extension), activeDocument!.lines.join('\n'));
       setExportDialogOpen(false);
     }
 

@@ -117,6 +117,27 @@ describe('TabBar', () => {
     expect(onAddClick).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the "+" (New document) button as the rightmost element, after all tabs', () => {
+    const docs = [makeDoc('1', 'Alpha'), makeDoc('2', 'Beta'), makeDoc('3', 'Gamma')];
+    render(
+      <TabBar
+        documents={docs}
+        activeDocumentId="1"
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+        onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
+      />
+    );
+    const tablist = screen.getByRole('tablist');
+    const addButton = screen.getByRole('button', { name: 'New document' });
+    const children = Array.from(tablist.children);
+    expect(children[children.length - 1]).toBe(addButton);
+    // Sanity check: the tabs precede it, in document order.
+    const tabs = screen.getAllByRole('tab');
+    expect(children.indexOf(tabs[tabs.length - 1])).toBeLessThan(children.indexOf(addButton));
+  });
+
   it('renders a settings button only for the active tab and calls onSettingsClick without triggering onSelect', () => {
     const onSelect = vi.fn();
     const onSettingsClick = vi.fn();

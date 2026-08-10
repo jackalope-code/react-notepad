@@ -249,6 +249,49 @@ describe('useWorkspace — persistence', () => {
     vi.useRealTimers();
   });
 
+  it('persists edits across a full unmount/remount cycle (reload simulation)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const hook1 = await renderLoadedWorkspace();
+    const firstId = hook1.result.current.documents[0].id;
+
+    act(() => {
+      hook1.result.current.setLines(firstId, ['persisted via hook'], 0);
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    hook1.unmount();
+    vi.useRealTimers();
+
+    const hook2 = await renderLoadedWorkspace();
+    expect(hook2.result.current.documents[0].lines).toEqual(['persisted via hook']);
+  });
+
+  it('closing a tab persists the removal — remounting does not resurrect the closed document', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const hook1 = await renderLoadedWorkspace();
+    const firstId = hook1.result.current.documents[0].id;
+    let secondId = '';
+    act(() => {
+      secondId = hook1.result.current.addDocument('Second');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    act(() => {
+      hook1.result.current.closeDocument(secondId);
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    hook1.unmount();
+    vi.useRealTimers();
+
+    const hook2 = await renderLoadedWorkspace();
+    expect(hook2.result.current.documents.map((d) => d.id)).toEqual([firstId]);
+  });
+
   it('sets persistenceAvailable to false when a debounced write fails', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { result } = await renderLoadedWorkspace();
