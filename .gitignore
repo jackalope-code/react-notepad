@@ -27,7 +27,3 @@ dist-ssr
 
 # Test coverage
 coverage/
-
-# Upgrade plans
-UPGRADE_README.md
-V3_PLAN_BACKUP.md
