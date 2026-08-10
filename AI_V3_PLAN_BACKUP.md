@@ -40,15 +40,15 @@ Harden the existing test suite first, then ship a breaking `v3` storage format �
 14. **Clear undo/redo controls**: fix the invalid `aria-details` attribute (→ `aria-label`) on the existing undo/redo buttons, add visible text/tooltip labels, and disable each button when there's nothing to undo/redo.
 15. **No functional regressions**: undo/redo, cursor-line tracking, and wrap option keep working per-tab.
 
-## Phase 0 — `UPGRADE_README.md` (Rationale & Rope Alternative) `[DONE - NEEDS TESTING]`
+## Phase 0 — `AI_UPGRADE_README.md` (Rationale & Rope Alternative) `[DONE - NEEDS TESTING]`
 
-Write `UPGRADE_README.md` at the repo root, as a **living doc** (revisited/updated in Phase 10 once the rest of this plan actually ships). Contents:
+Write `AI_UPGRADE_README.md` at the repo root, as a **living doc** (revisited/updated in Phase 12 once the rest of this plan actually ships). Contents:
 
 - [x] **Where we're at today**: current `lines: string[]` model, v1→v2 localStorage migration, delta-based undo/redo — summarized from the "Current State" section above.
 - [x] **Perf improvements & choices made so far**: the three findings from the prior audit (full `join`/`split` per keystroke, un-debounced `localStorage.setItem`, `getCursorLine`'s O(n) scan) and the reasoning already captured above for each — why the `join`/`split` cost was left alone, why the `localStorage` debounce fix was deferred to Phase 3's IndexedDB writes instead of patched twice, and how Phase 5 opportunistically fixes the cursor-scan cost as a byproduct of adding column tracking.
 - [x] **What a rope would gain** (trie is not applicable here — tries suit prefix lookups like autocomplete, not mutable document text; a **rope** or piece-table is the correct structure for this use case): explain that a rope avoids full-document `join`/`split` per keystroke by representing text as a balanced tree of chunks, making edits/inserts O(log n) instead of O(n), and would let the live `<textarea>` UI itself scale to very large documents (the one gap this plan's IndexedDB/perf work explicitly does **not** close — see Flagged Risks).
 - [x] **Starting point for a rope implementation** (sketch only, not implemented in this plan): outline swapping `lines: string[]` for a rope data structure behind the same `computeDelta`/`applyDelta`/`revertDelta` interface so undo/redo logic wouldn't need to change; note that the `<textarea>` DOM element itself would still need to be replaced with a virtualized/windowed rendering component (e.g. rendering only visible lines) since a native `<textarea>` requires the full string as its `value` regardless of the underlying data structure — so a rope alone doesn't fix DOM rendering at scale, both changes would be needed together.
-- [x] Cross-reference this plan file (`notepad-storage-multidoc-38c0f1.md`) as the source of truth for what's actually being implemented now; the README documents rationale/history and a **future** option, not new work being done in this pass.
+- [x] Cross-reference this plan file (`AI_V3_PLAN_BACKUP.md`) as the source of truth for what's actually being implemented now; the README documents rationale/history and a **future** option, not new work being done in this pass.
 
 ## Phase 1 — Test Hardening & Coverage-Gap Fixes (prioritized first) `[DONE - NEEDS TESTING]`
 
@@ -153,19 +153,22 @@ function loadWorkspace(legacyKeys: LegacyLocalStorageSnapshot): StoredWorkspaceV
 - [x] Tests: `TabBar.test.tsx` updated + new test; `App.test.tsx` gained 4 integration tests (settings nav, Back, Save, orphaned-id redirect). Note: the orphaned-id test needed to navigate via a `hashchange` event *after* mount rather than presetting `window.location.hash` before render — the latter was flaky in the full multi-file suite.
 - [x] Confirmed: 209/209 tests pass (stable across repeated runs), `tsc -b --noEmit` clean, `npm run build` succeeds, coverage thresholds met.
 
-## Phase 8 — Migration, Integrity & Coverage Tests `[NOT STARTED]`
+## Phase 8 — Migration, Integrity & Coverage Tests `[IN PROGRESS]`
 
-- [ ] `notepadTypes.test.ts`: unit tests for `migrateV1toV2` and `migrateV2toV3` **independently** (each stage testable in isolation), plus the composed `loadWorkspace` for v1→v3 and v2→v3 end-to-end paths, v3-passthrough (no-op) when IndexedDB already has v3 data, and the **mixed-version** case (legacy keys at different versions simultaneously).
-- [ ] Integrity-check tests: deliberately corrupt intermediate output (e.g. truncate a line) and assert fallback-to-blank-document behavior fires instead of throwing or silently losing data.
-- [ ] `indexedDbStore.test.ts`: round-trip put/get, using `fake-indexeddb` (new dev dependency) for jsdom compatibility; simulated `indexedDB.open` failure exercising the Phase 3 fail-safe fallback; simulated quota-exceeded rejection on `putWorkspace` (parallel to the existing `localStorage` quota test).
-- [ ] `useWorkspace.test.ts`: add/close tabs, active-tab switching, per-tab undo/redo isolation, persistence round-trip across remount, migration-on-first-load from seeded `localStorage`, the last-tab-cannot-close invariant, and closing a tab actually persisting (reload doesn't resurrect it).
-- [ ] `TabBar.test.tsx`: `+` always rightmost; tab switching; close-tab fallback selection; New Document dialog creates a document with only a title (no extension prompt).
-- [ ] `export.test.ts`: Export Document dialog offers preset + arbitrary extensions; `Blob` contents and filename built from title + the extension chosen at export time (including sanitizing filesystem-unsafe characters, empty/whitespace-only titles, and unicode titles); exporting the same document twice with different chosen extensions produces different filenames without mutating stored document state; two tabs with identical titles exporting with the same extension doesn't crash or corrupt either `Blob`.
-- [ ] `MarkdownNotepad.test.tsx`: typing markdown syntax renders expected inline formatting; content round-trips through `lines: string[]` correctly (no HTML leaking into stored data); toggling `markdownEnabled` swaps editors without losing content, including mid-edit toggles; pasting raw HTML is sanitized to markdown text.
-- [ ] `DocumentSettings.test.tsx` (with a router test wrapper): renders current markdown toggle state; **Save** persists change and navigates to `/`; **Back** discards in-progress change and navigates to `/` unchanged; navigating to a deleted document's settings id redirects to `/`.
-- [ ] `CursorStatus.test.tsx` / `Notepad.component.test.tsx` additions: bottom-left status bar shows correct `Line {n}, Col {m}` across typing, arrow-key navigation, and mouse clicks — including a regression test that a **single** click updates the cursor position without requiring a second click.
-- [ ] `LineNumberGutter.test.tsx`: toggling the global "Line numbers" checkbox shows/hides the gutter; gutter text has `user-select: none` and is excluded from any copy/selection of the textarea content; gutter count matches `lines.length` and updates as lines are added/removed.
-- [ ] Enforce coverage threshold (from Phase 1 tooling) now against the full new `src/utils/**` surface, including the new migration/IndexedDB files.
+Most test items below are already implemented across existing test files (not necessarily in the standalone files the original plan named). Items marked `[x]` are done; remaining gaps are marked `[ ]`.
+
+- [x] `notepadTypes.test.ts` (76 tests): unit tests for `migrateV1toV2` and `migrateV2toV3` **independently** (each stage testable in isolation), plus the composed `loadWorkspace` for v1→v3 and v2→v3 end-to-end paths, and the **mixed-version** case (legacy keys at different versions simultaneously). *(v3-passthrough no-op when IndexedDB already has v3 data is exercised in `useWorkspace.test.ts` instead.)*
+- [x] Integrity-check tests (`notepadTypes.test.ts` → `verifyTextMigrationIntegrity`): deliberately corrupt intermediate output (e.g. truncate a line, duplicate a line, mismatched char count) and assert fallback-to-blank-document behavior fires instead of throwing or silently losing data.
+- [x] `indexedDbStore.test.ts` (5 tests): round-trip put/get using `fake-indexeddb`; simulated `indexedDB` unavailable failure exercising the Phase 3 fail-safe fallback; simulated quota-exceeded rejection on `putWorkspace`.
+- [x] `useWorkspace.test.ts` (19 tests): add/close tabs, active-tab switching, per-tab undo/redo isolation, persistence round-trip across remount, migration-on-first-load from seeded `localStorage`, the last-tab-cannot-close invariant, and closing a tab actually persisting (reload doesn't resurrect it).
+- [x] `TabBar.test.tsx` (8 tests): `+` always rightmost; tab switching; close-tab fallback selection; New Document dialog creates a document with only a title (no extension prompt).
+- [x] Export tests: `ExportDialog.test.tsx` (9 tests) covers preset + arbitrary extensions, dialog open/close, and download trigger; `exportFilename.test.ts` (11 tests) covers `sanitizeFilenameTitle`/`buildExportFilename` including filesystem-unsafe characters, empty/whitespace titles, and unicode.
+- [x] Markdown overlay tests: `MarkdownOverlayNotepad.test.tsx` (22 tests) covers overlay/textarea text-content parity, windowing, className application, active/inactive-line reveal-hide behavior, heading-scale/bullet-glyph gating, and no-transformation edits. *(Replaces the original `MarkdownNotepad.test.tsx` item — TipTap was removed in Phase 8.5.)*
+- [x] DocumentSettings tests: covered via `App.test.tsx` integration tests (4 tests) — settings nav, Back discards, Save persists + swaps editor, orphaned-id redirect. *(Not a standalone `DocumentSettings.test.tsx` file.)*
+- [x] Cursor status tests: `Notepad.component.test.tsx` covers `Line {n}, Col {m}` across typing, arrow-key navigation, mouse clicks, select, and focus — including the single-click regression test. `getCursorPosition` unit tests (8 tests) also in the same file.
+- [x] Line-number gutter tests: `Notepad.component.test.tsx` covers gutter visibility toggle, `aria-hidden`, `user-select: none`, line-count accuracy, and scroll-sync; `App.test.tsx` covers the checkbox toggle end-to-end.
+- [ ] **Coverage threshold not met**: `npm run test:coverage` fails with 84.89% branches vs the 90% threshold. Main gaps: `markdownTokenizer.ts` (76.4% branches), `rope.ts` (82.05% branches), `DocumentSettings.tsx` (75% branches). Additional branch tests or `/* v8 ignore */` pragmas for genuinely-unreachable branches are needed to close this gap.
+- [ ] **Missing dedicated test files**: the original plan named `DocumentSettings.test.tsx`, `CursorStatus.test.tsx`, and `LineNumberGutter.test.tsx` as standalone files. Coverage currently comes from integration tests in `App.test.tsx` and `Notepad.component.test.tsx` instead. Decide whether to extract standalone files or accept the current integration-test coverage.
 
 ## Phase 8.5 — Custom Markdown Overlay Editor (Replaces TipTap) `[DONE]`
 
@@ -198,27 +201,27 @@ New `notepadTypes.perf.test.ts` (or a dedicated `perf/` folder run via `npm run 
 - [ ] These tests target the **in-memory model and IndexedDB persistence**, not the `<textarea>` DOM rendering — rendering a literal 2GB string into a real `<textarea>` is a separate, out-of-scope UI/virtualization problem (see Non-Goals).
 - [ ] Perf tests run in a separate, longer-timeout Vitest project/config so they don't slow down the default `npm run test` feedback loop; wire a separate `npm run test:perf` script.
 
-## Phase 10 — Cleanup & Verification `[NOT STARTED]`
-
-- [ ] **Update `UPGRADE_README.md`** (from Phase 0) to reflect what actually shipped: confirm/correct the "where we're at" section against the final v3 architecture (IndexedDB, tabs, markdown, extensions, cursor/line-numbers), and note whether the rope/piece-table option is still the recommended next step or if priorities have shifted.
-- [ ] Remove `src/utils/persistence.tsx` (confirm no imports first).
-- [ ] Run full `npm run test` (with coverage) and `npm run test:perf`; run `npm run build` to confirm no TS errors.
-- [ ] Manual smoke test: fresh install, seeded v1 `localStorage`, seeded v2 `localStorage`, multi-tab add/close/switch, undo/redo per-tab (including disabled-state at history boundaries), wrap toggle, line-number gutter toggle, cursor status bar (line+col) while typing/clicking/arrow-navigating — with specific attention to **single-click** mouse clicks updating the cursor position immediately (no double-click required), markdown toggle via Document Settings (Save and Back both paths, verifying new docs default on / migrated docs default off), file export choosing several different extensions for the same document, and a manual large-paste test in the real browser UI to observe actual textarea behavior at scale.
-
-## Phase 12 — Touch D-Pad for Cursor Navigation `[NOT STARTED]`
-
-*(Numbered Phase 12 per explicit request; Phase 11 does not exist in this plan.)*
+## Phase 10 — Touch D-Pad for Cursor Navigation `[NOT STARTED]`
 
 - [ ] New `CursorDPad.tsx`: floating fixed-position D-pad (4 directional buttons), shown only when `window.matchMedia('(pointer: coarse)').matches` (touch device), re-checked on the media query's `change` event.
-- [ ] **Notepad (textarea)**: synthetic `KeyboardEvent`s don't move `selectionStart` in real browsers (untrusted events) — movement computed manually (line/column math off `lines`) then applied via `textarea.setSelectionRange()`, re-running the same cursor-status-update logic the click/keyup handlers use.
-- [ ] **MarkdownNotepad (TipTap)**: same limitation for `contenteditable`. Use ProseMirror's public APIs directly: `Selection.near(doc.resolve(pos ± 1))` for Left/Right; `view.coordsAtPos`/`view.posAtCoords` (screen-coordinate-based) for Up/Down; dispatch via `editor.view.dispatch(tr.setSelection(...))`.
+- [ ] **Notepad / VirtualizedNotepad (textarea)**: synthetic `KeyboardEvent`s don't move `selectionStart` in real browsers (untrusted events) — movement computed manually (line/column math off `lines`) then applied via `textarea.setSelectionRange()`, re-running the same cursor-status-update logic the click/keyup handlers use.
+- [ ] **MarkdownOverlayNotepad (textarea + overlay)**: same textarea-based approach as above — both editors use a real `<textarea>` under the hood, so the same `setSelectionRange()` + cursor-status-update logic applies to both. No ProseMirror/contentEditable APIs needed (TipTap was removed in Phase 8.5).
 - [ ] `preventDefault()` on button press to avoid stealing focus/closing the on-screen keyboard; hold-to-repeat (~350ms initial delay, ~80ms interval).
 - [ ] Tests: D-pad visibility gated on `matchMedia` mock; each direction's boundary clamping; status bar updates after a single press (no double-press needed, same spirit as the Phase 5 single-click fix); hold-repeat via `vi.useFakeTimers()`; no focus/selection loss.
 - [ ] **Not in scope**: no separate scroll-only buttons — this D-pad only moves the cursor, per the chosen design.
 
+## Phase 12 — Cleanup & Verification `[NOT STARTED]`
+
+*(Phase 11 does not exist in this plan. Phase 12 is the final cleanup/verification phase.)*
+
+- [ ] **Update `AI_UPGRADE_README.md`** (from Phase 0) to reflect what actually shipped: confirm/correct the "where we're at" section against the final v3 architecture (IndexedDB, tabs, markdown overlay, extensions, cursor/line-numbers, rope/virtualized editor), and note whether the rope/piece-table option is still the recommended next step or if priorities have shifted.
+- [x] Remove `src/utils/persistence.tsx` — already done in Phase 1 (confirmed zero imports).
+- [ ] Run full `npm run test` (with coverage) and `npm run test:perf`; run `npm run build` to confirm no TS errors. **Note**: as of the latest audit, `npm run test:coverage` fails with 84.89% branches vs the 90% threshold — this must be resolved before Phase 12 can close.
+- [ ] Manual smoke test: fresh install, seeded v1 `localStorage`, seeded v2 `localStorage`, multi-tab add/close/switch, undo/redo per-tab (including disabled-state at history boundaries), wrap toggle, line-number gutter toggle, cursor status bar (line+col) while typing/clicking/arrow-navigating — with specific attention to **single-click** mouse clicks updating the cursor position immediately (no double-click required), markdown toggle via Document Settings (Save and Back both paths, verifying new docs default on / migrated docs default off), file export choosing several different extensions for the same document, and a manual large-paste test in the real browser UI to observe actual textarea behavior at scale.
+
 ## Phase 13 — Rope Data Structure & Virtualized Editor, Behind Two Independent Flags `[DONE]`
 
-Reverses two original Non-Goals (rope rewrite, virtualized rendering), delivering the Phase 0 README's "starting point sketch" as a real, defaulted-on implementation — gated behind two independent code-level flags so it's reversible and differentially testable against the current model. Scoped to plain-text `Notepad` only; `MarkdownNotepad`/ProseMirror unchanged.
+Reverses two original Non-Goals (rope rewrite, virtualized rendering), delivering the Phase 0 README's "starting point sketch" as a real, defaulted-on implementation — gated behind two independent code-level flags so it's reversible and differentially testable against the current model. Originally scoped to plain-text `Notepad` only; Phase 8.5 later brought markdown documents onto the same windowing via `MarkdownOverlayNotepad`.
 
 - [x] New `featureFlags.ts`: `USE_ROPE_MODEL = true` and `USE_VIRTUALIZED_EDITOR = true` (both default to the new/optimal behavior). Code-level constants only — no runtime toggle UI yet; noted as a future demo/debug-panel upgrade.
 - [x] New `TextBuffer` interface with two implementations — `LinesBuffer` (wraps current `lines: string[]` behavior exactly) and `RopeBuffer` (backed by a new `Rope` class) — selected via `USE_ROPE_MODEL`. `computeDelta`/`applyDelta`/`revertDelta` operate against this abstraction so undo/redo semantics are identical either way.
@@ -226,7 +229,7 @@ Reverses two original Non-Goals (rope rewrite, virtualized rendering), deliverin
 - [x] New `VirtualizedNotepad.tsx`: windowed rendering (visible line range from scroll position + line height) through the same `TextBuffer` abstraction; used instead of `Notepad.tsx` when `USE_VIRTUALIZED_EDITOR` is true; `Notepad.tsx` remains the fallback.
 - [x] **Storage format unaffected by either flag**: `lines: string[]` stays the persisted IndexedDB shape regardless of flag state — rope is purely in-memory, converted at the storage boundary.
 - [x] Tests — shared conformance suite (`TextBuffer` interface run against both `LinesBuffer`/`RopeBuffer`, same assertions); `rope.test.ts` edge cases + differential/fuzz testing vs. a naive reference string; migration/round-trip safety (flag-flip round-trip produces byte-identical `lines`); `computeDelta`/`applyDelta`/`revertDelta` re-run against both backends; `VirtualizedNotepad.test.tsx` (visible-range calc, editing-while-scrolled, fallback on flag-off, no data loss); flag-combination smoke matrix (all 4 combinations mount + accept an edit without throwing).
-- [x] Update `UPGRADE_README.md` and this plan's Non-Goals to cross-reference that they're superseded by this phase.
+- [x] Update `AI_UPGRADE_README.md` and this plan's Non-Goals to cross-reference that they're superseded by this phase.
 
 ## Flagged Risks (need acknowledgment, not blocking plan approval)
 

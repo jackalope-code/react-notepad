@@ -1,6 +1,6 @@
 # Upgrade Rationale: v3 Multi-Document Storage Redesign
 
-> **Living document.** This file is updated as the plan in `notepad-storage-multidoc-38c0f1.md` (Windsurf plans directory) actually ships, so it always reflects the real, current state of the codebase — not just the original intent. See `V3_PLAN_BACKUP.md` at the repo root for the full phase-by-phase plan and progress checklist.
+> **Living document.** This file is updated as the plan in `AI_V3_PLAN_BACKUP.md` (repo root) actually ships, so it always reflects the real, current state of the codebase — not just the original intent. See `AI_V3_PLAN_BACKUP.md` for the full phase-by-phase plan and progress checklist.
 >
 > **Do not reference personal user directories, usernames, or absolute local file paths anywhere in this document.** Use repo-relative paths only (e.g. `src/Notepad.tsx`, not `C:\Users\<name>\...\src\Notepad.tsx`).
 
@@ -48,10 +48,10 @@ The TipTap/ProseMirror `MarkdownNotepad` from Phase 6 was fully removed and repl
 3. **Cursor-alignment constraint (the one hard rule of this architecture)**: every character in the overlay must stay exactly as wide as the corresponding character in the underlying monospace textarea, or the overlay desyncs from the real caret position. This was violated once (heading text scaled via `font-size`) and caused a real bug — the caret would appear "stuck" mid-word because the enlarged overlay glyphs no longer lined up with where the real (unscaled) caret actually was. Fixed by switching to CSS `transform: scale()` for visual enlargement, which doesn't affect layout width, combined with an **active-line / inactive-line split**: the line the cursor is currently on always renders at plain, accurate size with all markdown markers visible (for correct editing); every other line renders stylized (headings enlarged, `#`/`**`/`*`/list markers hidden, list bullets shown as a real `•`) — the standard Typora/Obsidian live-preview pattern.
 4. **Known, accepted trade-off**: `transform: scale()` enlarges glyphs visually but doesn't reflow layout *height*, and `VirtualizedNotepad`'s windowing assumes a uniform fixed line height for all lines. An enlarged inactive heading can therefore visually bleed into the line directly below it — a cosmetic overlap only; scroll-position/virtualization math stays exact. A pixel-perfect fix would need variable-row-height virtualization, a materially larger change, so this is accepted the same way Phase 5's word-wrap/gutter desync risk was accepted rather than solved.
 
-See `V3_PLAN_BACKUP.md` Phase 8.5 for the full checklist and test coverage.
+See `AI_V3_PLAN_BACKUP.md` Phase 8.5 for the full checklist and test coverage.
 
 ## Current upgrade status
 
-Cross-reference `V3_PLAN_BACKUP.md` (repo root) and the canonical plan `notepad-storage-multidoc-38c0f1.md` for the authoritative, up-to-date phase-by-phase checklist. This README documents rationale and history; it is **not** the source of truth for what's implemented — the plan's phase status tags (`[NOT STARTED]` / `[IN PROGRESS]` / `[DONE - NEEDS TESTING]` / `[DONE]`) are.
+Cross-reference `AI_V3_PLAN_BACKUP.md` (repo root) for the authoritative, up-to-date phase-by-phase checklist. This README documents rationale and history; it is **not** the source of truth for what's implemented — the plan's phase status tags (`[NOT STARTED]` / `[IN PROGRESS]` / `[DONE - NEEDS TESTING]` / `[DONE]`) are.
 
-This section will be updated once the plan actually ships (Phase 10) to reflect the real final v3 architecture (IndexedDB, tabs, markdown, extensions, cursor/line-numbers) and to re-confirm or revise whether the rope option above is still the recommended next step.
+This section will be updated once the plan actually ships (Phase 12 — Cleanup & Verification) to reflect the real final v3 architecture (IndexedDB, tabs, markdown overlay, extensions, cursor/line-numbers, rope/virtualized editor) and to re-confirm or revise whether the rope option above is still the recommended next step.
