@@ -1,6 +1,8 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import MainView from './MainView';
 import DocumentSettings from './DocumentSettings';
+import DiagnosticsPage from './DiagnosticsPage';
+import DiagnosticsBanner from './DiagnosticsBanner';
 import { useWorkspace } from './useWorkspace';
 
 // HashRouter (rather than BrowserRouter) is used because this app is
@@ -23,9 +25,11 @@ function App() {
 
   return (
     <HashRouter>
+      <DiagnosticsBanner />
       <Routes>
         <Route path="/" element={<MainView workspace={workspace} />} />
         <Route path="/settings/:documentId" element={<DocumentSettings workspace={workspace} />} />
+        <Route path="/diagnostics" element={<DiagnosticsPage />} />
       </Routes>
     </HashRouter>
   );

@@ -1,4 +1,5 @@
 import { marked, type Token, type Tokens } from 'marked';
+import { logError } from '../diagnostics';
 
 // ---------------------------------------------------------------------------
 // Markdown offset-recovery tokenizer (Phase 8.5 Part B)
@@ -297,7 +298,8 @@ export function computeCharClasses(text: string): (string | null)[] {
   try {
     const tokens = marked.lexer(text);
     walkBlockTokens(tokens, text, 0, classes);
-  } catch {
+  } catch (err) {
+    logError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
     // Defensive fallback per plan: never let a highlighting bug hide or
     // corrupt real content — fall through to plain/unstyled text.
     return new Array(text.length).fill(null);
