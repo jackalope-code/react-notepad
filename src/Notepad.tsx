@@ -30,7 +30,8 @@ const StyledTextArea = styled.textarea.withConfig({
     highlight-on-focus: true;
     highlight-color: lightgray;
     resize: none;
-`;
+    padding: 0;
+`
 
 // ---------------------------------------------------------------------------
 // Exported types

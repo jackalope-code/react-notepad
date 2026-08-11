@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getCursorPosition, type NotepadOptions } from './Notepad';
 
 // ---------------------------------------------------------------------------
@@ -104,6 +104,7 @@ const OverlayTextArea = styled.textarea.withConfig({
   border: none;
   resize: none;
   overflow: hidden;
+  padding: 0;
   font-family: monospace;
   white-space: ${(p) => (p.notepadWrap ? 'pre-wrap' : 'pre')};
   overflow-wrap: ${(p) => (p.notepadWrap ? 'break-word' : 'normal')};
@@ -130,6 +131,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
   const [windowStart, setWindowStart] = useState(0);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingSelectionRef = useRef<number | null>(null);
 
   // Defensive clamp for render/edit math: if `lines` shrank (e.g. after an
   // undo) further than the last scroll-driven `windowStart`, don't let the
@@ -168,8 +170,24 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
     const positionInWindow = getCursorPosition(newWindowLines, event.target.selectionStart);
     const cursorLine = effectiveWindowStart + positionInWindow.line;
     setCursorPosition({ line: cursorLine, column: positionInWindow.column });
+    pendingSelectionRef.current = event.target.selectionStart;
     setLines(nextLines, cursorLine);
   }
+
+  // After a controlled re-render updates the textarea's value prop (which
+  // may differ from what the user typed if the window was capped at
+  // WINDOW_LINES and a line was dropped from the end), restore the cursor
+  // to where the user placed it. Without this, the browser resets
+  // selectionStart to the end of the new value, causing the cursor to
+  // jump to the bottom of the visible window.
+  useLayoutEffect(() => {
+    if (pendingSelectionRef.current !== null && textAreaRef.current) {
+      const pos = Math.min(pendingSelectionRef.current, textAreaRef.current.value.length);
+      textAreaRef.current.selectionStart = pos;
+      textAreaRef.current.selectionEnd = pos;
+      pendingSelectionRef.current = null;
+    }
+  });
 
   function handleCursorMove(
     event:
