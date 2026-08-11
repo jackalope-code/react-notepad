@@ -27,8 +27,6 @@ const StyledTextArea = styled.textarea.withConfig({
     height: 100dvh;
     overflow-y: scroll;
     overflow-x: ${(props) => (props.notepadWrap ? 'hidden' : 'scroll')};
-    highlight-on-focus: true;
-    highlight-color: lightgray;
     resize: none;
     padding: 0;
 `

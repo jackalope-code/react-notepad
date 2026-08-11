@@ -27,9 +27,8 @@ textarea {
     padding-left: 10px;
 }
 
-textarea:active {
+textarea:focus {
     outline: none;
-    outline-color: rgb(0, 170, 227)
 }
 
 @media print {
