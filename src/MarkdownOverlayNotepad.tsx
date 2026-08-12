@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getCursorPosition, type NotepadOptions } from './Notepad';
 import { WINDOW_LINES, OVERSCAN_LINES, useMeasuredLineHeight } from './VirtualizedNotepad';
 import { computeLineSegments } from './utils/markdownTokenizer';
@@ -295,6 +295,29 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
     });
   }
 
+  // Track cursor position via the document-level 'selectionchange' event.
+  // On mobile, onFocus/onClick fire before the browser has updated
+  // selectionStart to the tapped position, causing the active line to be
+  // off by one. selectionchange fires after the selection is actually
+  // updated, giving us the correct position.
+  const selectionHandlerRef = useRef<() => void>(() => {});
+  selectionHandlerRef.current = () => {
+    const ta = textAreaRef.current;
+    if (ta && document.activeElement === ta) {
+      const positionInWindow = getCursorPosition(windowLines, ta.selectionStart);
+      setCursorPosition({
+        line: effectiveWindowStart + positionInWindow.line,
+        column: positionInWindow.column,
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handler = () => selectionHandlerRef.current();
+    document.addEventListener('selectionchange', handler);
+    return () => document.removeEventListener('selectionchange', handler);
+  }, []);
+
   const windowHeight = Math.max(windowLines.length, 1) * lineHeight;
   // Markdown markers (##, **, *, >, etc.) are hidden by default and only
   // revealed on the line the cursor currently occupies (before any
@@ -351,7 +374,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
             onKeyUp={handleCursorMove}
             onClick={handleCursorMove}
             onSelect={handleCursorMove}
-            onFocus={handleCursorMove}
+            onTouchEnd={() => requestAnimationFrame(() => selectionHandlerRef.current())}
           />
         </WindowRow>
       </VirtualScrollContainer>
