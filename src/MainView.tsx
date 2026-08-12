@@ -151,18 +151,21 @@ function MainView({ workspace }: MainViewProps) {
       <TitleInput className="title" type="text" onChange={(e) => setTitle(activeDocument!.id, e.currentTarget.value)} value={activeDocument.title} />
       {activeDocument.markdownEnabled ? (
         <MarkdownOverlayNotepad
+          key={activeDocument.id}
           lines={activeDocument.lines}
           setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
           options={activeDocument.options}
         />
       ) : USE_VIRTUALIZED_EDITOR ? (
         <VirtualizedNotepad
+          key={activeDocument.id}
           lines={activeDocument.lines}
           setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
           options={activeDocument.options}
         />
       ) : (
         <Notepad
+          key={activeDocument.id}
           lines={activeDocument.lines}
           setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
           options={activeDocument.options}

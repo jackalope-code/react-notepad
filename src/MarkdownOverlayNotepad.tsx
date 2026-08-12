@@ -58,6 +58,7 @@ const WindowRow = styled.div<{ $top: number; $height: number }>`
   left: 0;
   width: 100%;
   height: ${(p) => p.$height}px;
+  min-height: 100dvh;
 `;
 
 // Shared font metrics — kept identical between the overlay and the
@@ -367,6 +368,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
           <TransparentTextArea
             ref={textAreaRef}
             data-testid="markdown-overlay-textarea"
+            autoFocus
             notepadWrap={options.text.notepadWrap}
             wrap={options.text.notepadWrap ? 'on' : 'off'}
             value={windowLines.join('\n')}

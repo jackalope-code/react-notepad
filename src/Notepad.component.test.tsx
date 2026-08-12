@@ -171,11 +171,11 @@ describe('Notepad component', () => {
     expect(cursorLine).toBe(1);
   });
 
-  it('shows "Line —, Col —" when no cursor interaction has occurred', () => {
+  it('shows the cursor position on mount because the textarea auto-focuses', () => {
     render(
       <Notepad lines={['hello']} setLines={makeSetLines()} options={defaultOptions} />,
     );
-    expect(screen.getByText('Line —, Col —')).toBeInTheDocument();
+    expect(screen.getByText('Line 1, Col 1')).toBeInTheDocument();
   });
 
   it('shows 1-based line and column in the status bar after a change event', () => {

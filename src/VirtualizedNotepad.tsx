@@ -101,6 +101,7 @@ const OverlayTextArea = styled.textarea.withConfig({
 })<OverlayTextAreaProps>`
   flex: 1 1 auto;
   height: ${(p) => p.$height}px;
+  min-height: 100dvh;
   border: none;
   resize: none;
   overflow: hidden;
@@ -217,6 +218,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
           <OverlayTextArea
             ref={textAreaRef}
             data-testid="virtualized-textarea"
+            autoFocus
             $height={windowHeight}
             notepadWrap={options.text.notepadWrap}
             wrap={options.text.notepadWrap ? 'on' : 'off'}

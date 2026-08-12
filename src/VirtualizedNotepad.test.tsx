@@ -17,9 +17,9 @@ describe('VirtualizedNotepad', () => {
     expect(textarea.value).toBe(lines.join('\n'));
   });
 
-  it('shows the initial cursor placeholder before any interaction', () => {
+  it('shows the cursor position on mount because the textarea auto-focuses', () => {
     render(<VirtualizedNotepad lines={makeLines(3)} setLines={vi.fn()} options={defaultOptions} />);
-    expect(screen.getByText('Line —, Col —')).toBeInTheDocument();
+    expect(screen.getByText('Line 1, Col 1')).toBeInTheDocument();
   });
 
   it('renders the optional line-number gutter with correct numbering for the current window', () => {

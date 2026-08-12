@@ -243,6 +243,7 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
         )}
         <StyledTextArea
           ref={textAreaRef}
+          autoFocus
           onKeyUp={handleCursorMove}
           onClick={handleCursorMove}
           onSelect={handleCursorMove}
