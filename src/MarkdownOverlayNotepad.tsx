@@ -209,7 +209,6 @@ const EditorContainer = styled.div`
 
 const OverlayLine = styled.div`
   height: 20px;
-  overflow: hidden;
 `;
 
 const TransparentTextArea = styled.textarea.withConfig({
