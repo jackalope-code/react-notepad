@@ -138,12 +138,8 @@ function MainView({ workspace }: MainViewProps) {
         </button>
         <input id="input-toolbar-wrap-text" type="checkbox" name="input-toolbar-wrap-text" checked={activeDocument.options.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>
         <label htmlFor="input-toolbar-wrap-text">Wrap text</label>
-        {!activeDocument.markdownEnabled && (
-          <>
-            <input id="input-toolbar-line-numbers" type="checkbox" name="input-toolbar-line-numbers" checked={!!activeDocument.options.text.showLineNumbers} onChange={(e) => handleOptionChanged("options.text.showLineNumbers", e)}/>
-            <label htmlFor="input-toolbar-line-numbers">Line numbers</label>
-          </>
-        )}
+        <input id="input-toolbar-line-numbers" type="checkbox" name="input-toolbar-line-numbers" checked={!!activeDocument.options.text.showLineNumbers} onChange={(e) => handleOptionChanged("options.text.showLineNumbers", e)}/>
+        <label htmlFor="input-toolbar-line-numbers">Line numbers</label>
         <button onClick={() => setExportDialogOpen(true)} aria-label="Save as file">
           <FontAwesomeIcon icon={faFileExport} /> Save as file
         </button>

@@ -70,6 +70,7 @@ const VirtualScrollContainer = styled.div`
 
 const Sizer = styled.div<{ $height: number }>`
   height: ${(p) => p.$height}px;
+  min-height: 100dvh;
 `;
 
 const WindowRow = styled.div<{ $top: number }>`

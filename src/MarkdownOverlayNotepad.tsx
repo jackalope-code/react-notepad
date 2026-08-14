@@ -50,6 +50,7 @@ const VirtualScrollContainer = styled.div`
 
 const Sizer = styled.div<{ $height: number }>`
   height: ${(p) => p.$height}px;
+  min-height: 100dvh;
 `;
 
 const WindowRow = styled.div<{ $top: number; $height: number }>`
@@ -59,6 +60,8 @@ const WindowRow = styled.div<{ $top: number; $height: number }>`
   width: 100%;
   height: ${(p) => p.$height}px;
   min-height: 100dvh;
+  display: flex;
+  align-items: stretch;
 `;
 
 // Shared font metrics — kept identical between the overlay and the
@@ -186,8 +189,27 @@ const HighlightOverlay = styled.div.withConfig({
   }
 `;
 
+const LineNumberGutter = styled.div`
+  flex: 0 0 auto;
+  padding: 0 8px;
+  text-align: right;
+  color: gray;
+  background-color: #f5f5f5;
+  border-right: 1px solid lightgray;
+  font-family: monospace;
+  white-space: pre;
+  user-select: none;
+`;
+
+const EditorContainer = styled.div`
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+`;
+
 const OverlayLine = styled.div`
   min-height: 1em;
+  overflow: hidden;
 `;
 
 const TransparentTextArea = styled.textarea.withConfig({
@@ -330,11 +352,20 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
       <VirtualScrollContainer onScroll={handleScroll} data-testid="virtual-scroll-container">
         <Sizer $height={lines.length * lineHeight} />
         <WindowRow $top={effectiveWindowStart * lineHeight} $height={windowHeight}>
-          <HighlightOverlay
-            notepadWrap={options.text.notepadWrap}
-            aria-hidden="true"
-            data-testid="markdown-overlay"
-          >
+          {options.text.showLineNumbers && (
+            <LineNumberGutter
+              aria-hidden="true"
+              data-testid="markdown-overlay-gutter"
+            >
+              {windowLines.map((_, i) => `${effectiveWindowStart + i + 1}\n`)}
+            </LineNumberGutter>
+          )}
+          <EditorContainer>
+            <HighlightOverlay
+              notepadWrap={options.text.notepadWrap}
+              aria-hidden="true"
+              data-testid="markdown-overlay"
+            >
             {windowLines.map((line, i) => {
               const globalIndex = effectiveWindowStart + i;
               const segments = allLineSegments[globalIndex] ?? [{ text: line, className: '' }];
@@ -365,19 +396,20 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
               );
             })}
           </HighlightOverlay>
-          <TransparentTextArea
-            ref={textAreaRef}
-            data-testid="markdown-overlay-textarea"
-            autoFocus
-            notepadWrap={options.text.notepadWrap}
-            wrap={options.text.notepadWrap ? 'on' : 'off'}
-            value={windowLines.join('\n')}
-            onChange={handleChange}
-            onKeyUp={handleCursorMove}
-            onClick={handleCursorMove}
-            onSelect={handleCursorMove}
-            onTouchEnd={() => requestAnimationFrame(() => selectionHandlerRef.current())}
-          />
+            <TransparentTextArea
+              ref={textAreaRef}
+              data-testid="markdown-overlay-textarea"
+              autoFocus
+              notepadWrap={options.text.notepadWrap}
+              wrap={options.text.notepadWrap ? 'on' : 'off'}
+              value={windowLines.join('\n')}
+              onChange={handleChange}
+              onKeyUp={handleCursorMove}
+              onClick={handleCursorMove}
+              onSelect={handleCursorMove}
+              onTouchEnd={() => requestAnimationFrame(() => selectionHandlerRef.current())}
+            />
+          </EditorContainer>
         </WindowRow>
       </VirtualScrollContainer>
       <StatusBar>
