@@ -208,7 +208,7 @@ const EditorContainer = styled.div`
 `;
 
 const OverlayLine = styled.div`
-  min-height: 1em;
+  height: 20px;
   overflow: hidden;
 `;
 
@@ -322,11 +322,13 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   // On mobile, onFocus/onClick fire before the browser has updated
   // selectionStart to the tapped position, causing the active line to be
   // off by one. selectionchange fires after the selection is actually
-  // updated, giving us the correct position.
+  // updated, giving us the correct position. We no longer gate on
+  // activeElement === ta because the event can fire during the focus
+  // transition before the textarea is reported as the active element.
   const selectionHandlerRef = useRef<() => void>(() => {});
   selectionHandlerRef.current = () => {
     const ta = textAreaRef.current;
-    if (ta && document.activeElement === ta) {
+    if (ta) {
       const positionInWindow = getCursorPosition(windowLines, ta.selectionStart);
       setCursorPosition({
         line: effectiveWindowStart + positionInWindow.line,
@@ -407,7 +409,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
               onKeyUp={handleCursorMove}
               onClick={handleCursorMove}
               onSelect={handleCursorMove}
-              onTouchEnd={() => requestAnimationFrame(() => selectionHandlerRef.current())}
+              onTouchEnd={() => setTimeout(() => selectionHandlerRef.current(), 0)}
             />
           </EditorContainer>
         </WindowRow>
