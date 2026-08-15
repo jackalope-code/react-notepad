@@ -3,6 +3,7 @@ import MainView from './MainView';
 import DocumentSettings from './DocumentSettings';
 import DiagnosticsPage from './DiagnosticsPage';
 import DiagnosticsBanner from './DiagnosticsBanner';
+import PersistenceBanner from './PersistenceBanner';
 import { useWorkspace } from './useWorkspace';
 
 // HashRouter (rather than BrowserRouter) is used because this app is
@@ -25,6 +26,11 @@ function App() {
 
   return (
     <HashRouter>
+      <PersistenceBanner
+        loading={workspace.loading}
+        persistenceAvailable={workspace.persistenceAvailable}
+        usingLocalStorageFallback={workspace.usingLocalStorageFallback}
+      />
       <DiagnosticsBanner />
       <Routes>
         <Route path="/" element={<MainView workspace={workspace} />} />

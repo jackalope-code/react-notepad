@@ -61,12 +61,50 @@ describe('useWorkspace — initial load', () => {
     expect(result.current.activeDocumentId).toBe('doc-1');
   });
 
-  it('falls back to an in-memory blank workspace when IndexedDB is unavailable', async () => {
+  it('falls back to a localStorage workspace when IndexedDB is unavailable', async () => {
     // @ts-expect-error simulate an environment without IndexedDB support
     delete globalThis.indexedDB;
     const { result } = await renderLoadedWorkspace();
-    expect(result.current.persistenceAvailable).toBe(false);
+    expect(result.current.usingLocalStorageFallback).toBe(true);
+    expect(result.current.persistenceAvailable).toBe(true);
     expect(result.current.documents).toHaveLength(1);
+    expect(localStorage.getItem('react-notepad-workspace-v3-fallback')).toContain(result.current.documents[0].id);
+    globalThis.indexedDB = new IDBFactory();
+  });
+
+  it('loads an existing localStorage fallback workspace when IndexedDB is unavailable', async () => {
+    const fallback: StoredWorkspaceV3 = {
+      version: 3,
+      documents: [
+        { id: 'fallback-doc', title: 'From localStorage', lines: ['fallback'], options: { text: { notepadWrap: true } }, markdownEnabled: true },
+      ],
+      activeDocumentId: 'fallback-doc',
+    };
+    localStorage.setItem('react-notepad-workspace-v3-fallback', JSON.stringify(fallback));
+
+    // @ts-expect-error simulate an environment without IndexedDB support
+    delete globalThis.indexedDB;
+    const { result } = await renderLoadedWorkspace();
+
+    expect(result.current.usingLocalStorageFallback).toBe(true);
+    expect(result.current.documents).toEqual(fallback.documents);
+    expect(result.current.activeDocumentId).toBe('fallback-doc');
+    globalThis.indexedDB = new IDBFactory();
+  });
+
+  it('falls back to an in-memory blank workspace when both IndexedDB and localStorage are unavailable', async () => {
+    // @ts-expect-error simulate an environment without IndexedDB support
+    delete globalThis.indexedDB;
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('localStorage quota exceeded');
+    });
+
+    const { result } = await renderLoadedWorkspace();
+    expect(result.current.persistenceAvailable).toBe(false);
+    expect(result.current.usingLocalStorageFallback).toBe(false);
+    expect(result.current.documents).toHaveLength(1);
+
+    setItemSpy.mockRestore();
     globalThis.indexedDB = new IDBFactory();
   });
 });
@@ -292,7 +330,7 @@ describe('useWorkspace — persistence', () => {
     expect(hook2.result.current.documents.map((d) => d.id)).toEqual([firstId]);
   });
 
-  it('sets persistenceAvailable to false when a debounced write fails', async () => {
+  it('switches to localStorage fallback when a debounced IndexedDB write fails', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { result } = await renderLoadedWorkspace();
     const firstId = result.current.documents[0].id;
@@ -305,11 +343,23 @@ describe('useWorkspace — persistence', () => {
       result.current.setLines(firstId, ['fails'], 0);
     });
 
+    // Flush the IndexedDB debounce and the promise rejection catch that
+    // switches to the localStorage fallback.
     await act(async () => {
       vi.advanceTimersByTime(500);
     });
 
-    await waitFor(() => expect(result.current.persistenceAvailable).toBe(false));
+    expect(result.current.usingLocalStorageFallback).toBe(true);
+    expect(result.current.persistenceAvailable).toBe(true);
+
+    // Flush the localStorage fallback debounce.
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const raw = localStorage.getItem('react-notepad-workspace-v3-fallback');
+    expect(raw).toBeTruthy();
+    expect(raw as string).toContain('fails');
     putWorkspaceSpy.mockRestore();
     vi.useRealTimers();
   });

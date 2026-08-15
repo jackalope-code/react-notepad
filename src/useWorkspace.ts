@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getWorkspace, putWorkspace } from './utils/indexedDbStore';
+import { getFallbackWorkspace, putFallbackWorkspace } from './utils/localStorageWorkspaceStore';
 import {
   loadWorkspace,
   type StoredWorkspaceV3,
@@ -68,6 +69,7 @@ export const useWorkspace = () => {
   const [activeDocumentId, setActiveDocumentIdInternal] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
+  const [usingLocalStorageFallback, setUsingLocalStorageFallback] = useState(false);
   const [historyByDoc, setHistoryByDocState] = useState<Record<string, DocHistory>>({});
 
   const documentsRef = useRef<StoredDocumentV3[]>(documents);
@@ -75,6 +77,8 @@ export const useWorkspace = () => {
   const historyRef = useRef<Record<string, DocHistory>>(historyByDoc);
   const persistenceAvailableRef = useRef(persistenceAvailable);
   persistenceAvailableRef.current = persistenceAvailable;
+  const usingLocalStorageFallbackRef = useRef(usingLocalStorageFallback);
+  usingLocalStorageFallbackRef.current = usingLocalStorageFallback;
 
   const commitDocuments = useCallback((nextDocs: StoredDocumentV3[]) => {
     documentsRef.current = nextDocs;
@@ -94,8 +98,21 @@ export const useWorkspace = () => {
   const debouncedPersistRef = useRef(
     debounce((workspace: StoredWorkspaceV3) => {
       putWorkspace(workspace).catch(() => {
-        setPersistenceAvailable(false);
+        setUsingLocalStorageFallback(true);
+        usingLocalStorageFallbackRef.current = true;
+        debouncedPersistToFallbackRef.current(workspace);
       });
+    }, PERSIST_DEBOUNCE_MS),
+  );
+
+  const debouncedPersistToFallbackRef = useRef(
+    debounce((workspace: StoredWorkspaceV3) => {
+      try {
+        putFallbackWorkspace(workspace);
+      } catch {
+        setUsingLocalStorageFallback(false);
+        setPersistenceAvailable(false);
+      }
     }, PERSIST_DEBOUNCE_MS),
   );
 
@@ -118,12 +135,49 @@ export const useWorkspace = () => {
         }
       } catch {
         if (cancelled) return;
-        // IndexedDB unavailable or failed — degrade to an in-memory-only
-        // workspace rather than blocking the app from loading at all.
-        setPersistenceAvailable(false);
-        const fallback = createBlankWorkspace();
-        commitDocuments(fallback.documents);
-        commitActiveDocumentId(fallback.activeDocumentId);
+
+        if (documentsRef.current.length > 0) {
+          // IndexedDB write failed after a workspace was already loaded/migrated
+          // in memory — flush that workspace to localStorage and keep going.
+          try {
+            putFallbackWorkspace({
+              version: 3,
+              documents: documentsRef.current,
+              activeDocumentId: activeDocumentIdRef.current,
+            });
+            setUsingLocalStorageFallback(true);
+            usingLocalStorageFallbackRef.current = true;
+          } catch {
+            setPersistenceAvailable(false);
+          }
+        } else {
+          const fallback = getFallbackWorkspace();
+          if (fallback) {
+            commitDocuments(fallback.documents);
+            commitActiveDocumentId(fallback.activeDocumentId);
+            setUsingLocalStorageFallback(true);
+            usingLocalStorageFallbackRef.current = true;
+          } else {
+            const migrated = loadWorkspace(readLegacySnapshot());
+            commitDocuments(migrated.documents);
+            commitActiveDocumentId(migrated.activeDocumentId);
+
+            try {
+              putFallbackWorkspace({
+                version: 3,
+                documents: migrated.documents,
+                activeDocumentId: migrated.activeDocumentId,
+              });
+              setUsingLocalStorageFallback(true);
+              usingLocalStorageFallbackRef.current = true;
+            } catch {
+              setPersistenceAvailable(false);
+              const blank = createBlankWorkspace();
+              commitDocuments(blank.documents);
+              commitActiveDocumentId(blank.activeDocumentId);
+            }
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -137,11 +191,18 @@ export const useWorkspace = () => {
 
   const persist = useCallback((nextDocuments: StoredDocumentV3[], nextActiveId: string) => {
     if (!persistenceAvailableRef.current) return;
-    debouncedPersistRef.current({
+
+    const workspace: StoredWorkspaceV3 = {
       version: 3,
       documents: nextDocuments,
       activeDocumentId: nextActiveId,
-    });
+    };
+
+    if (usingLocalStorageFallbackRef.current) {
+      debouncedPersistToFallbackRef.current(workspace);
+    } else {
+      debouncedPersistRef.current(workspace);
+    }
   }, []);
 
   const setActiveDocumentId = useCallback(
@@ -284,6 +345,7 @@ export const useWorkspace = () => {
   return {
     loading,
     persistenceAvailable,
+    usingLocalStorageFallback,
     documents,
     activeDocumentId,
     setActiveDocumentId,
