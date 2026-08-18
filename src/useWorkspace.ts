@@ -38,7 +38,7 @@ function readLegacySnapshot(): LegacyLocalStorageSnapshot {
 /** Only a `.md`/`.markdown` title opts into the markdown renderer by
  * default — anything else (including no extension) stays plain-text, so
  * a large imported .txt/.log/etc. file is never unexpectedly slowed down
- * by markdown tokenizing/highlighting on load. */
+ * by a non-optimized editor and markdown tokenizing/highlighting on load. */
 function isMarkdownFilename(title: string): boolean {
   return /\.(md|markdown)$/i.test(title.trim());
 }
