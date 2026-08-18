@@ -1,8 +1,11 @@
 import styled from 'styled-components';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button } from '@mui/material';
+import mermaid from 'mermaid';
 import { getCursorPosition, type NotepadOptions } from './Notepad';
 import { WINDOW_LINES, OVERSCAN_LINES, useMeasuredLineHeight } from './VirtualizedNotepad';
-import { computeLineSegments } from './utils/markdownTokenizer';
+import { computeLineSegments, findChartFences, type ChartFence } from './utils/markdownTokenizer';
+import InsertToolbar from './InsertToolbar';
 
 // ---------------------------------------------------------------------------
 // MarkdownOverlayNotepad (Phase 8.5 Part B)
@@ -187,6 +190,25 @@ const HighlightOverlay = styled.div.withConfig({
     color: #2563eb;
     font-weight: bold;
   }
+  /* Table cell/row decoration — border/background only, never a height or
+   * font-size change, so it can't desync the overlay from the textarea
+   * (each table row is still exactly one 20px source line). Always shown
+   * (not gated on the active line) since it's a persistent visual table,
+   * not a hideable syntax marker. */
+  .md-table-cell {
+    background-color: #f8fafc;
+    border-top: 1px solid #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
+  }
+  .md-table-pipe {
+    color: #94a3b8;
+  }
+  /* Fallback styling for a chart-fence line rendered as plain text (only
+   * possible at a window boundary edge case — see ChartThumbnail usage
+   * below); normally these lines are replaced entirely by a thumbnail. */
+  .md-chart-block {
+    background-color: #eef2ff;
+  }
 `;
 
 const LineNumberGutter = styled.div`
@@ -210,6 +232,220 @@ const EditorContainer = styled.div`
 const OverlayLine = styled.div`
   height: 20px;
 `;
+
+// A chart fence block renders as a single flow element spanning exactly as
+// many pixels as it would have taken as N separate 20px OverlayLines — so
+// it never changes the total flow height and can't push later lines out of
+// sync with the textarea underneath (see CARET_BUGS.md / EDITOR_DESIGN.md).
+const ChartBlockRow = styled.div<{ $height: number }>`
+  height: ${(p) => p.$height}px;
+  width: 100%;
+`;
+
+// Positioned absolutely (top/height passed via inline style) inside
+// ChartOverlayLayer, which is rendered *after* TransparentTextArea in the
+// DOM — i.e. on top of it — so this is the topmost element wherever a
+// chart is drawn. That's essential, not decorative: previously the real
+// textarea painted on top of the (pointer-events: none) HighlightOverlay,
+// so its native caret/spellcheck rendered over the chart and it silently
+// intercepted every click before the thumbnail's onClick ever fired. See
+// ChartOverlayLayer below for the rest of this fix.
+const ChartThumbnailContainer = styled.div`
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px dashed #94a3b8;
+  background-color: #f8fafc;
+  border-radius: 4px;
+
+  & svg {
+    width: 100%;
+    height: 100%;
+  }
+`;
+
+// pointer-events: none so any gap/edge-case pixel not covered by an actual
+// ChartThumbnailContainer child falls through to the real textarea below.
+const ChartOverlayLayer = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+`;
+
+const ChartErrorBadge = styled.div`
+  color: #b91c1c;
+  font-size: 0.8rem;
+  padding: 0 8px;
+`;
+
+const ChartPreviewPane = styled.div`
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 8px;
+
+  & svg {
+    max-width: 100%;
+    max-height: 100%;
+  }
+`;
+
+let mermaidInitialized = false;
+function ensureMermaidInitialized() {
+  if (!mermaidInitialized) {
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+    mermaidInitialized = true;
+  }
+}
+
+interface ChartThumbnailProps {
+  id: string;
+  source: string;
+  top: number;
+  heightPx: number;
+  onOpenEditor: () => void;
+}
+
+// Renders a fixed-size (heightPx) rendered preview of a mermaid chart, or a
+// small error badge if the source is invalid. The container's box size
+// never depends on the rendered SVG's natural size — the SVG is stretched
+// to fill it (see ChartThumbnailContainer's `& svg` rule) — so the chart
+// can never grow the overlay row beyond the fence's line count.
+function ChartThumbnail({ id, source, top, heightPx, onOpenEditor }: ChartThumbnailProps) {
+  const [svg, setSvg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    ensureMermaidInitialized();
+    let cancelled = false;
+    mermaid
+      .render(`chart-thumb-${id}`, source.trim() || ' ')
+      .then((result) => {
+        if (!cancelled) {
+          setSvg(result.svg);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSvg(null);
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, source]);
+
+  return (
+    <ChartThumbnailContainer
+      style={{ top, height: heightPx }}
+      onClick={onOpenEditor}
+      data-testid="chart-thumbnail"
+      role="button"
+      aria-label="Edit chart"
+    >
+      {error ? (
+        <ChartErrorBadge>⚠ Invalid chart — tap to edit</ChartErrorBadge>
+      ) : svg ? (
+        <div style={{ width: '100%', height: '100%' }} dangerouslySetInnerHTML={{ __html: svg }} />
+      ) : (
+        <span>Rendering…</span>
+      )}
+    </ChartThumbnailContainer>
+  );
+}
+
+interface ChartEditorPopoverProps {
+  fence: ChartFence | null;
+  onSave: (source: string) => void;
+  onClose: () => void;
+}
+
+// Floating popover — a MUI Dialog — positioned outside the document flow
+// entirely, so nothing about it can ever affect the overlay/textarea line
+// grid. This is the *only* place chart source text is edited; the inline
+// thumbnail is never directly editable (see EDITOR_DESIGN.md / plan).
+function ChartEditorPopover({ fence, onSave, onClose }: ChartEditorPopoverProps) {
+  const [source, setSource] = useState('');
+  const [svg, setSvg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (fence) setSource(fence.source);
+  }, [fence]);
+
+  useEffect(() => {
+    if (!fence) return;
+    ensureMermaidInitialized();
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      mermaid
+        .render('chart-editor-preview', source.trim() || ' ')
+        .then((result) => {
+          if (!cancelled) {
+            setSvg(result.svg);
+            setError(null);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setSvg(null);
+            setError(err instanceof Error ? err.message : String(err));
+          }
+        });
+      // Debounced (rather than on every keystroke) since mermaid.render()
+      // re-parses/lays out the whole diagram synchronously each call.
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [fence, source]);
+
+  return (
+    <Dialog open={fence !== null} onClose={onClose} maxWidth="md" fullWidth data-testid="chart-editor-popover">
+      <DialogTitle>Edit Chart</DialogTitle>
+      <DialogContent style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <TextField
+          multiline
+          minRows={10}
+          fullWidth
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          slotProps={{ input: { style: { fontFamily: 'monospace' } } }}
+        />
+        <ChartPreviewPane>
+          {error ? (
+            <ChartErrorBadge>{error}</ChartErrorBadge>
+          ) : svg ? (
+            <div dangerouslySetInnerHTML={{ __html: svg }} />
+          ) : (
+            <span>Rendering…</span>
+          )}
+        </ChartPreviewPane>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={() => onSave(source)}>
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
 const TransparentTextArea = styled.textarea.withConfig({
   shouldForwardProp: (prop) => prop !== 'notepadWrap',
@@ -252,6 +488,13 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
 
+  // Set while the user is in "placement mode" after choosing a table size
+  // or chart type from InsertToolbar — the next click/tap in the document
+  // inserts these lines at that position instead of moving the cursor.
+  const [pendingInsertLines, setPendingInsertLines] = useState<string[] | null>(null);
+  // The chart fence currently open in the floating editor popover, or null.
+  const [chartPopoverFence, setChartPopoverFence] = useState<ChartFence | null>(null);
+
   const effectiveWindowStart = Math.max(0, Math.min(windowStart, Math.max(0, lines.length - 1)));
   const windowEnd = Math.min(lines.length, effectiveWindowStart + WINDOW_LINES);
   const windowLines = lines.slice(effectiveWindowStart, windowEnd);
@@ -260,6 +503,9 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   // blocks, multi-line blockquotes) straddling a window boundary are still
   // classified correctly — only the window's slice is actually rendered.
   const allLineSegments = useMemo(() => computeLineSegments(lines.join('\n')), [lines]);
+  // Top-level mermaid fences, by line range, so their raw text can be
+  // replaced with a fixed-size ChartThumbnail (see ChartThumbnail above).
+  const chartFences = useMemo(() => findChartFences(lines.join('\n')), [lines]);
 
   function handleScroll(event: React.UIEvent<HTMLDivElement>) {
     const scrollTop = event.currentTarget.scrollTop;
@@ -317,6 +563,33 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
     });
   }
 
+  // While in placement mode (a table/chart has been chosen from
+  // InsertToolbar but not yet placed), a click in the document inserts the
+  // pending lines at the clicked line instead of just moving the cursor.
+  function handleTextAreaClick(event: React.MouseEvent<HTMLTextAreaElement>) {
+    if (pendingInsertLines) {
+      const positionInWindow = getCursorPosition(windowLines, event.currentTarget.selectionStart);
+      const targetLine = effectiveWindowStart + positionInWindow.line;
+      const nextLines = [...lines.slice(0, targetLine), ...pendingInsertLines, ...lines.slice(targetLine)];
+      setPendingInsertLines(null);
+      setLines(nextLines, targetLine);
+      return;
+    }
+    handleCursorMove(event);
+  }
+
+  // Saves edited chart source from the popover back into the document,
+  // replacing the fence's full line range (opening/closing fences +
+  // inner source) with a regenerated block using the same language tag.
+  function handleSaveChart(newSource: string) {
+    if (!chartPopoverFence) return;
+    const fence = chartPopoverFence;
+    const newFenceLines = [`\`\`\`${fence.lang}`, ...newSource.split('\n'), '```'];
+    const nextLines = [...lines.slice(0, fence.startLine), ...newFenceLines, ...lines.slice(fence.endLine + 1)];
+    setChartPopoverFence(null);
+    setLines(nextLines, fence.startLine);
+  }
+
   // Track cursor position via the document-level 'selectionchange' event.
   // On mobile, onFocus/onClick fire before the browser has updated
   // selectionStart to the tapped position, causing the active line to be
@@ -348,6 +621,77 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   // interaction, cursorPosition is null and every line stays hidden).
   const activeLine = cursorPosition?.line ?? -1;
 
+  // Builds the overlay's row elements, replacing every line inside a chart
+  // fence's range with a single ChartThumbnail block instead of per-line
+  // text spans (see ChartBlockRow above for why this can't desync the
+  // caret grid). Known limitation: if a fence straddles the current
+  // window's top boundary (fence.startLine falls outside the window but
+  // fence.endLine is inside it), those in-window lines are skipped rather
+  // than mis-rendered as raw text — same category of accepted trade-off as
+  // the existing soft-wrap windowing limitation noted above.
+  const overlayRows: React.ReactNode[] = [];
+  for (let i = 0; i < windowLines.length; i++) {
+    const globalIndex = effectiveWindowStart + i;
+    const fence = chartFences.find((f) => f.startLine === globalIndex);
+    if (fence) {
+      const fenceLineCount = fence.endLine - fence.startLine + 1;
+      // Pure height-reserving spacer — the actual clickable/visible chart
+      // is rendered separately in ChartOverlayLayer (after the textarea in
+      // the DOM, see below) so it can actually receive clicks and occlude
+      // the real textarea's native caret/spellcheck decorations.
+      overlayRows.push(<ChartBlockRow key={`chart-${globalIndex}`} $height={fenceLineCount * lineHeight} />);
+      i += fenceLineCount - 1;
+      continue;
+    }
+    const insideFenceRange = chartFences.some((f) => globalIndex > f.startLine && globalIndex <= f.endLine);
+    if (insideFenceRange) continue;
+
+    const line = windowLines[i];
+    const segments = allLineSegments[globalIndex] ?? [{ text: line, className: '' }];
+    const isActiveLine = globalIndex === activeLine;
+    overlayRows.push(
+      <OverlayLine key={globalIndex}>
+        {segments.map((seg, j) => {
+          const classList = seg.className ? seg.className.split(' ') : [];
+          const isMarker = classList.includes('md-marker');
+          const isBulletMarker = classList.includes('md-list-marker-bullet');
+          const isHeadingContent = classList.includes('md-heading') && !isMarker;
+
+          const extra: string[] = [];
+          if (!isActiveLine) {
+            if (isMarker) extra.push('md-marker-hidden');
+            if (isBulletMarker) extra.push('md-bullet-glyph');
+            if (isHeadingContent) extra.push('md-heading-scaled');
+          }
+
+          const className = [seg.className, ...extra].filter(Boolean).join(' ');
+          return (
+            <span key={j} className={className || undefined}>
+              {seg.text}
+            </span>
+          );
+        })}
+      </OverlayLine>,
+    );
+  }
+
+  // Chart fences visible (even partially) in the current window, with the
+  // absolute top/height (in px, relative to EditorContainer) at which each
+  // should be drawn in ChartOverlayLayer. Clamped to the window's bounds so
+  // a fence straddling a window edge still gets a (partial) clickable box
+  // rather than nothing.
+  const visibleChartBlocks = chartFences
+    .filter((f) => f.endLine >= effectiveWindowStart && f.startLine < windowEnd)
+    .map((f) => {
+      const clampedStart = Math.max(f.startLine, effectiveWindowStart);
+      const clampedEnd = Math.min(f.endLine, windowEnd - 1);
+      return {
+        fence: f,
+        top: (clampedStart - effectiveWindowStart) * lineHeight,
+        height: (clampedEnd - clampedStart + 1) * lineHeight,
+      };
+    });
+
   return (
     <>
       <VirtualScrollContainer onScroll={handleScroll} data-testid="virtual-scroll-container">
@@ -367,35 +711,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
               aria-hidden="true"
               data-testid="markdown-overlay"
             >
-            {windowLines.map((line, i) => {
-              const globalIndex = effectiveWindowStart + i;
-              const segments = allLineSegments[globalIndex] ?? [{ text: line, className: '' }];
-              const isActiveLine = globalIndex === activeLine;
-              return (
-                <OverlayLine key={globalIndex}>
-                  {segments.map((seg, j) => {
-                    const classList = seg.className ? seg.className.split(' ') : [];
-                    const isMarker = classList.includes('md-marker');
-                    const isBulletMarker = classList.includes('md-list-marker-bullet');
-                    const isHeadingContent = classList.includes('md-heading') && !isMarker;
-
-                    const extra: string[] = [];
-                    if (!isActiveLine) {
-                      if (isMarker) extra.push('md-marker-hidden');
-                      if (isBulletMarker) extra.push('md-bullet-glyph');
-                      if (isHeadingContent) extra.push('md-heading-scaled');
-                    }
-
-                    const className = [seg.className, ...extra].filter(Boolean).join(' ');
-                    return (
-                      <span key={j} className={className || undefined}>
-                        {seg.text}
-                      </span>
-                    );
-                  })}
-                </OverlayLine>
-              );
-            })}
+            {overlayRows}
           </HighlightOverlay>
             <TransparentTextArea
               ref={textAreaRef}
@@ -406,10 +722,22 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
               value={windowLines.join('\n')}
               onChange={handleChange}
               onKeyUp={handleCursorMove}
-              onClick={handleCursorMove}
+              onClick={handleTextAreaClick}
               onSelect={handleCursorMove}
               onTouchEnd={() => setTimeout(() => selectionHandlerRef.current(), 0)}
             />
+            <ChartOverlayLayer>
+              {visibleChartBlocks.map(({ fence, top, height }) => (
+                <ChartThumbnail
+                  key={`chart-click-${fence.startLine}`}
+                  id={`${fence.startLine}`}
+                  source={fence.source}
+                  top={top}
+                  heightPx={height}
+                  onOpenEditor={() => setChartPopoverFence(fence)}
+                />
+              ))}
+            </ChartOverlayLayer>
           </EditorContainer>
         </WindowRow>
       </VirtualScrollContainer>
@@ -418,6 +746,12 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
           ? `Line ${cursorPosition.line + 1}, Col ${cursorPosition.column + 1}`
           : 'Line —, Col —'}
       </StatusBar>
+      <InsertToolbar
+        active={pendingInsertLines !== null}
+        onPrepareInsert={setPendingInsertLines}
+        onCancelPlacement={() => setPendingInsertLines(null)}
+      />
+      <ChartEditorPopover fence={chartPopoverFence} onSave={handleSaveChart} onClose={() => setChartPopoverFence(null)} />
     </>
   );
 };

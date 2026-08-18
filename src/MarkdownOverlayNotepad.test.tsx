@@ -265,4 +265,116 @@ describe('MarkdownOverlayNotepad', () => {
       expect(nextLines[nextLines.length - 1]).toBe(lines[lines.length - 1]);
     });
   });
+
+  describe('InsertToolbar — GUI-driven table/chart insertion', () => {
+    it('renders the floating insert toolbar', () => {
+      render(<MarkdownOverlayNotepad lines={makeLines(3)} setLines={vi.fn()} options={defaultOptions} />);
+      expect(screen.getByTestId('insert-toolbar')).toBeInTheDocument();
+    });
+
+    it('placing a table via the toolbar splices generated pipe-table lines at the clicked line', () => {
+      const setLines = vi.fn();
+      const lines = ['first line', 'second line', 'third line'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+
+      fireEvent.click(screen.getByLabelText('Insert options'));
+      fireEvent.click(screen.getByLabelText('Insert table'));
+      fireEvent.click(screen.getByRole('button', { name: /next: tap placement/i }));
+
+      // Placement mode is now active — the toolbar is replaced by a banner.
+      expect(screen.getByTestId('placement-banner')).toBeInTheDocument();
+
+      const textarea = screen.getByTestId('markdown-overlay-textarea') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'selectionStart', { value: lines[0].length + 1, configurable: true });
+      fireEvent.click(textarea);
+
+      expect(setLines).toHaveBeenCalledTimes(1);
+      const [nextLines] = setLines.mock.calls[0];
+      // Default 3x3 table: header + divider + 3 body rows = 5 lines inserted
+      // after "first line", before "second line"/"third line".
+      expect(nextLines[0]).toBe('first line');
+      expect(nextLines.some((l: string) => l.startsWith('| Header 1'))).toBe(true);
+      expect(nextLines.some((l: string) => l.includes('---'))).toBe(true);
+      expect(nextLines).toContain('second line');
+      expect(nextLines).toContain('third line');
+    });
+
+    it('cancelling placement mode does not modify the document', () => {
+      const setLines = vi.fn();
+      render(<MarkdownOverlayNotepad lines={makeLines(3)} setLines={setLines} options={defaultOptions} />);
+
+      fireEvent.click(screen.getByLabelText('Insert options'));
+      fireEvent.click(screen.getByLabelText('Insert chart'));
+      fireEvent.click(screen.getByRole('button', { name: /next: tap placement/i }));
+      expect(screen.getByTestId('placement-banner')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+      expect(screen.queryByTestId('placement-banner')).not.toBeInTheDocument();
+      expect(setLines).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Chart fence rendering', () => {
+    it('renders a mermaid fence as a chart thumbnail instead of raw text spans, without changing overlay flow height', () => {
+      const lines = ['before', '```mermaid', 'graph TD;', '  A --> B;', '```', 'after'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={vi.fn()} options={defaultOptions} />);
+
+      expect(screen.getByTestId('chart-thumbnail')).toBeInTheDocument();
+      const overlay = screen.getByTestId('markdown-overlay');
+      expect(overlay.textContent).not.toContain('graph TD;');
+    });
+
+    it('clicking the chart thumbnail opens the chart editor popover with the fence source', () => {
+      const lines = ['```mermaid', 'graph TD;', '  A --> B;', '```'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={vi.fn()} options={defaultOptions} />);
+
+      fireEvent.click(screen.getByTestId('chart-thumbnail'));
+      const popover = screen.getByTestId('chart-editor-popover');
+      expect(popover).toBeInTheDocument();
+      // MUI's multiline TextField renders an extra hidden shadow <textarea>
+      // for autosizing, so query the first (visible) one directly rather
+      // than relying on getByDisplayValue matching a single element.
+      const sourceField = popover.querySelector('textarea') as HTMLTextAreaElement;
+      expect(sourceField.value).toBe('graph TD;\n  A --> B;');
+    });
+
+    it('positions the chart click layer AFTER the textarea in the DOM (paints on top of it)', () => {
+      // Regression guard for the stacking bug: without an explicit z-index,
+      // later siblings paint on top of earlier ones. The real <textarea>
+      // must not be the last sibling in EditorContainer, or it silently
+      // intercepts every click/caret/spellcheck-decoration over a chart —
+      // exactly what happened before this was fixed. jsdom can't simulate
+      // real hit-testing (fireEvent.click dispatches straight to the node
+      // you pass it, bypassing paint order), so this DOM-order assertion is
+      // the fast/unit-level substitute; see the Playwright e2e suite for a
+      // real-browser hit-testing check of the same invariant.
+      const lines = ['```mermaid', 'graph TD;', '  A --> B;', '```'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={vi.fn()} options={defaultOptions} />);
+
+      const textarea = screen.getByTestId('markdown-overlay-textarea');
+      const editorContainer = textarea.parentElement as HTMLElement;
+      const siblings = Array.from(editorContainer.children);
+      const textareaIndex = siblings.indexOf(textarea);
+      const chartThumbnail = screen.getByTestId('chart-thumbnail');
+      const chartLayerIndex = siblings.findIndex((el) => el.contains(chartThumbnail));
+
+      expect(chartLayerIndex).toBeGreaterThan(textareaIndex);
+    });
+
+    it('saving the chart editor popover writes the edited source back into the document', () => {
+      const setLines = vi.fn();
+      const lines = ['```mermaid', 'graph TD;', '  A --> B;', '```', 'after'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+
+      fireEvent.click(screen.getByTestId('chart-thumbnail'));
+      const popover = screen.getByTestId('chart-editor-popover');
+      const sourceField = popover.querySelector('textarea') as HTMLTextAreaElement;
+      fireEvent.change(sourceField, { target: { value: 'graph TD;\n  X --> Y;' } });
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+      expect(setLines).toHaveBeenCalledTimes(1);
+      const [nextLines] = setLines.mock.calls[0];
+      expect(nextLines).toEqual(['```mermaid', 'graph TD;', '  X --> Y;', '```', 'after']);
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeCharClasses, computeLineSegments } from './markdownTokenizer';
+import { computeCharClasses, computeLineSegments, findChartFences } from './markdownTokenizer';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,9 +23,68 @@ describe('computeLineSegments — round-trip safety', () => {
     '   ',
     '**unclosed bold',
     'nested **bold *and italic* inside**',
+    '| a | b |\n| --- | --- |\n| 1 | 2 |',
+    '```mermaid\ngraph TD;\n  A --> B;\n```',
   ])('reconstructs %j exactly, character-for-character', (text) => {
     const segments = computeLineSegments(text);
     expect(reconstruct(segments)).toBe(text);
+  });
+});
+
+describe('computeCharClasses — tables', () => {
+  it('marks pipes as md-table-pipe and cell content as md-table-cell', () => {
+    const text = '| a | b |\n| --- | --- |\n| 1 | 2 |';
+    const classes = computeCharClasses(text);
+    expect(classes[0]).toContain('md-table-pipe'); // leading '|'
+    expect(classes[2]).toContain('md-table-cell'); // 'a'
+    expect(classes[2]).toContain('md-table');
+  });
+});
+
+describe('computeCharClasses — mermaid chart fences', () => {
+  it('marks a mermaid fence as md-chart-block, not md-code-block', () => {
+    const text = '```mermaid\ngraph TD;\n  A --> B;\n```';
+    const classes = computeCharClasses(text);
+    const bodyIndex = text.indexOf('graph');
+    expect(classes[bodyIndex]).toContain('md-chart-block');
+    expect(classes[bodyIndex]).not.toContain('md-code-block');
+  });
+
+  it('still marks a non-mermaid fence as md-code-block', () => {
+    const text = '```js\nconst x = 1;\n```';
+    const classes = computeCharClasses(text);
+    const bodyIndex = text.indexOf('const');
+    expect(classes[bodyIndex]).toContain('md-code-block');
+    expect(classes[bodyIndex]).not.toContain('md-chart-block');
+  });
+});
+
+describe('findChartFences', () => {
+  it('finds a single top-level mermaid fence with correct line range and inner source', () => {
+    const text = 'Intro\n```mermaid\ngraph TD;\n  A --> B;\n```\nOutro';
+    const fences = findChartFences(text);
+    expect(fences).toHaveLength(1);
+    expect(fences[0].startLine).toBe(1);
+    expect(fences[0].endLine).toBe(4);
+    expect(fences[0].lang).toBe('mermaid');
+    expect(fences[0].source).toBe('graph TD;\n  A --> B;');
+  });
+
+  it('does not treat a non-mermaid fence as a chart fence', () => {
+    const text = '```js\nconst x = 1;\n```';
+    expect(findChartFences(text)).toHaveLength(0);
+  });
+
+  it('finds multiple chart fences in one document', () => {
+    const text = '```mermaid\nA\n```\ntext\n```mermaid\nB\n```';
+    const fences = findChartFences(text);
+    expect(fences).toHaveLength(2);
+    expect(fences[0].source).toBe('A');
+    expect(fences[1].source).toBe('B');
+  });
+
+  it('returns an empty array for text with no chart fences', () => {
+    expect(findChartFences('just plain text')).toEqual([]);
   });
 });
 

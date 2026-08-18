@@ -208,6 +208,55 @@ function applyFencedCodeBlock(raw: string, start: number, end: number, classes: 
   }
 }
 
+/** Fence languages that render as an inline chart thumbnail instead of a
+ * plain code block (see `ChartThumbnail` in `MarkdownOverlayNotepad.tsx`). */
+export const CHART_FENCE_LANGUAGES = new Set(['mermaid']);
+
+/** Marks a fenced code block whose info-string language is chart-enabled
+ * (currently just `mermaid`) as `md-chart-block` instead of `md-code-block`,
+ * still marking its opening/closing fence lines as `md-marker` so they can
+ * be dimmed/hidden the same way as any other marker. */
+function applyChartFenceBlock(raw: string, start: number, end: number, classes: (string | null)[]): void {
+  addClass(classes, start, end, 'md-chart-block');
+  const firstNewline = raw.indexOf('\n');
+  if (firstNewline !== -1) addClass(classes, start, start + firstNewline, 'md-marker');
+  const lastNewline = raw.lastIndexOf('\n');
+  if (lastNewline !== -1 && lastNewline > firstNewline) {
+    const closingFenceStart = raw.slice(0, -1).lastIndexOf('\n');
+    if (closingFenceStart !== -1) {
+      addClass(classes, start + closingFenceStart + 1, end, 'md-marker');
+    }
+  }
+}
+
+/** Marks a markdown table's `|`/`---` delimiters as `md-marker` and cell
+ * content as `md-table-cell`, one row at a time (header + each body row),
+ * so cell borders/shading can be applied purely via CSS without changing
+ * any row's layout height. */
+function walkTableToken(token: Tokens.Table, text: string, start: number, end: number, classes: (string | null)[]): void {
+  addClass(classes, start, end, 'md-table');
+  let lineStart = start;
+  while (lineStart < end) {
+    let lineEnd = text.indexOf('\n', lineStart);
+    if (lineEnd === -1 || lineEnd > end) lineEnd = end;
+    const line = text.slice(lineStart, lineEnd);
+    // Every `|` on a table line is a cell delimiter; mark each one as a
+    // dimmable marker while leaving the cell text itself styled as
+    // md-table-cell so it can get border/background decoration.
+    let cellStart = lineStart;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '|') {
+        addClass(classes, lineStart + i, lineStart + i + 1, 'md-table-pipe');
+        if (lineStart + i > cellStart) addClass(classes, cellStart, lineStart + i, 'md-table-cell');
+        cellStart = lineStart + i + 1;
+      }
+    }
+    if (lineStart + line.length > cellStart) addClass(classes, cellStart, lineStart + line.length, 'md-table-cell');
+    lineStart = lineEnd + 1;
+  }
+  void token;
+}
+
 function walkListToken(token: Tokens.List, text: string, start: number, end: number, classes: (string | null)[]): void {
   let searchCursor = start;
   for (const item of token.items) {
@@ -262,15 +311,24 @@ function walkBlockTokens(tokens: Token[], text: string, blockCursor: number, cla
         walkInlineTokens(token.tokens ?? [], token.text, start + contentOffset, classes);
         break;
       }
-      case 'code':
-        applyFencedCodeBlock(token.raw, start, end, classes);
+      case 'code': {
+        const codeToken = token as Tokens.Code;
+        if (codeToken.lang && CHART_FENCE_LANGUAGES.has(codeToken.lang.trim().toLowerCase())) {
+          applyChartFenceBlock(token.raw, start, end, classes);
+        } else {
+          applyFencedCodeBlock(token.raw, start, end, classes);
+        }
         break;
+      }
       case 'blockquote':
         addClass(classes, start, end, 'md-blockquote');
         markBlockquoteMarkers(text, start, end, classes);
         break;
       case 'list':
         walkListToken(token as Tokens.List, text, start, end, classes);
+        break;
+      case 'table':
+        walkTableToken(token as Tokens.Table, text, start, end, classes);
         break;
       case 'paragraph':
       case 'text': {
@@ -305,6 +363,56 @@ export function computeCharClasses(text: string): (string | null)[] {
     return new Array(text.length).fill(null);
   }
   return classes;
+}
+
+export interface ChartFence {
+  /** 0-based index of the fence's opening ```lang line. */
+  startLine: number;
+  /** 0-based index of the fence's closing ``` line (inclusive). */
+  endLine: number;
+  lang: string;
+  /** Inner chart source, excluding the opening/closing fence lines. */
+  source: string;
+}
+
+/**
+ * Finds all top-level chart-language (currently `mermaid`) fenced code
+ * blocks in `text`, returning their line ranges and inner source so the
+ * overlay can render a fixed-size chart thumbnail in place of the raw
+ * fence text (see `ChartThumbnail` in `MarkdownOverlayNotepad.tsx`).
+ * Only top-level blocks are considered — a chart nested inside e.g. a
+ * blockquote or list item is left as a plain code block.
+ */
+export function findChartFences(text: string): ChartFence[] {
+  const result: ChartFence[] = [];
+  try {
+    const tokens = marked.lexer(text);
+    let cursor = 0;
+    for (const token of tokens) {
+      if (token.type === 'code') {
+        const codeToken = token as Tokens.Code;
+        const lang = codeToken.lang?.trim().toLowerCase() ?? '';
+        if (CHART_FENCE_LANGUAGES.has(lang)) {
+          const startLine = text.slice(0, cursor).split('\n').length - 1;
+          // token.raw may include a trailing '\n' separating this block from
+          // the next one — strip it before counting lines, or the fence's
+          // line range would be off by one past its closing ``` line.
+          const lineCount = token.raw.replace(/\n$/, '').split('\n').length;
+          result.push({
+            startLine,
+            endLine: startLine + lineCount - 1,
+            lang,
+            source: codeToken.text,
+          });
+        }
+      }
+      cursor += token.raw.length;
+    }
+  } catch (err) {
+    logError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
+    return [];
+  }
+  return result;
 }
 
 /**
