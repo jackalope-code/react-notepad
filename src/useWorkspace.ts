@@ -35,6 +35,14 @@ function readLegacySnapshot(): LegacyLocalStorageSnapshot {
   };
 }
 
+/** Only a `.md`/`.markdown` title opts into the markdown renderer by
+ * default — anything else (including no extension) stays plain-text, so
+ * a large imported .txt/.log/etc. file is never unexpectedly slowed down
+ * by markdown tokenizing/highlighting on load. */
+function isMarkdownFilename(title: string): boolean {
+  return /\.(md|markdown)$/i.test(title.trim());
+}
+
 function createDocument(title: string, markdownEnabled: boolean): StoredDocumentV3 {
   return {
     id: crypto.randomUUID(),
@@ -215,7 +223,7 @@ export const useWorkspace = () => {
 
   const addDocument = useCallback(
     (title = 'Untitled') => {
-      const newDoc = createDocument(title, true);
+      const newDoc = createDocument(title, isMarkdownFilename(title));
       const nextDocs = [...documentsRef.current, newDoc];
       commitDocuments(nextDocs);
       commitActiveDocumentId(newDoc.id);

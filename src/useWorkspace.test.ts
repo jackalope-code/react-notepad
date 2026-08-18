@@ -120,9 +120,28 @@ describe('useWorkspace — document management', () => {
     });
 
     expect(result.current.documents).toHaveLength(2);
-    expect(result.current.documents[1]).toMatchObject({ title: 'Second Doc', markdownEnabled: true });
+    // No .md/.markdown extension in the title -> markdown stays disabled by
+    // default, so a large plain-text import is never unexpectedly slowed
+    // down by markdown tokenizing/highlighting.
+    expect(result.current.documents[1]).toMatchObject({ title: 'Second Doc', markdownEnabled: false });
     expect(result.current.activeDocumentId).toBe(newId);
     expect(result.current.documents[0].id).toBe(firstId);
+  });
+
+  it('addDocument enables markdown by default only when the title ends in .md/.markdown', async () => {
+    const { result } = await renderLoadedWorkspace();
+
+    let mdId = '';
+    act(() => {
+      mdId = result.current.addDocument('notes.md');
+    });
+    expect(result.current.documents.find((d) => d.id === mdId)).toMatchObject({ markdownEnabled: true });
+
+    let txtId = '';
+    act(() => {
+      txtId = result.current.addDocument('notes.txt');
+    });
+    expect(result.current.documents.find((d) => d.id === txtId)).toMatchObject({ markdownEnabled: false });
   });
 
   it('closeDocument removes the document and reassigns activeDocumentId if it was active', async () => {
