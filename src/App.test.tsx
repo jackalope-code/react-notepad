@@ -119,15 +119,27 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
 
-    // The new document defaults to markdownEnabled: true, so it renders
-    // MarkdownOverlayNotepad (its own textarea + highlight overlay) instead
-    // of the plain-text VirtualizedNotepad/Notepad textarea.
-    expect(document.querySelector('[data-testid="virtualized-textarea"]')).not.toBeInTheDocument();
-    expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).toBeInTheDocument();
+    // 'Second Doc' has no .md/.markdown extension, so it defaults to
+    // markdownEnabled: false and renders the plain-text VirtualizedNotepad,
+    // same as the initial 'Title' document below.
+    expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-testid="virtualized-textarea"]')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Title'));
     expect((document.querySelector('[data-testid="virtualized-textarea"]') as HTMLTextAreaElement).value).toBe('first doc content');
     expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).not.toBeInTheDocument();
+  });
+
+  it('a new document titled with a .md extension defaults to markdownEnabled and renders MarkdownOverlayNotepad', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: 'New document' }));
+    const titleField = await screen.findByLabelText('Title');
+    fireEvent.change(titleField, { target: { value: 'notes.md' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
+    expect(document.querySelector('[data-testid="markdown-overlay-textarea"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-testid="virtualized-textarea"]')).not.toBeInTheDocument();
   });
 
   it('closing a tab removes it and cannot remove the last remaining tab', async () => {
