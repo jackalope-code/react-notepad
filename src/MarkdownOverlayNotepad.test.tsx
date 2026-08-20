@@ -361,7 +361,7 @@ describe('MarkdownOverlayNotepad', () => {
       expect(chartLayerIndex).toBeGreaterThan(textareaIndex);
     });
 
-    it('saving the chart editor popover writes the edited source back into the document', () => {
+    it('closing the chart editor popover (via the Close button) commits the edited source back into the document', () => {
       const setLines = vi.fn();
       const lines = ['```mermaid', 'graph TD;', '  A --> B;', '```', 'after'];
       render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
@@ -370,11 +370,44 @@ describe('MarkdownOverlayNotepad', () => {
       const popover = screen.getByTestId('chart-editor-popover');
       const sourceField = popover.querySelector('textarea') as HTMLTextAreaElement;
       fireEvent.change(sourceField, { target: { value: 'graph TD;\n  X --> Y;' } });
-      fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+      fireEvent.click(screen.getByTestId('chart-editor-close'));
 
       expect(setLines).toHaveBeenCalledTimes(1);
       const [nextLines] = setLines.mock.calls[0];
       expect(nextLines).toEqual(['```mermaid', 'graph TD;', '  X --> Y;', '```', 'after']);
+    });
+
+    it('closing the chart editor popover with no edits does not call setLines (no spurious undo entry)', () => {
+      const setLines = vi.fn();
+      const lines = ['```mermaid', 'graph TD;', '  A --> B;', '```'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+
+      fireEvent.click(screen.getByTestId('chart-thumbnail'));
+      fireEvent.click(screen.getByTestId('chart-editor-close'));
+
+      expect(setLines).not.toHaveBeenCalled();
+    });
+
+    it('closing the chart editor popover via the MUI backdrop click also commits edits', () => {
+      const setLines = vi.fn();
+      const lines = ['```mermaid', 'graph TD;', '  A --> B;', '```'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+
+      fireEvent.click(screen.getByTestId('chart-thumbnail'));
+      const popover = screen.getByTestId('chart-editor-popover');
+      const sourceField = popover.querySelector('textarea') as HTMLTextAreaElement;
+      fireEvent.change(sourceField, { target: { value: 'graph TD;\n  X --> Y;' } });
+
+      // MUI renders the backdrop as a sibling of the dialog Paper within
+      // the same root; querying by class name avoids relying on internal
+      // MUI DOM structure beyond what's documented (data-testid isn't
+      // exposed on the backdrop itself).
+      const backdrop = document.querySelector('.MuiBackdrop-root') as HTMLElement;
+      fireEvent.click(backdrop);
+
+      expect(setLines).toHaveBeenCalledTimes(1);
+      const [nextLines] = setLines.mock.calls[0];
+      expect(nextLines).toEqual(['```mermaid', 'graph TD;', '  X --> Y;', '```']);
     });
   });
 });

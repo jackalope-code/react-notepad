@@ -14,7 +14,7 @@ import {
   type SelectChangeEvent,
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTable, faChartLine, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faTable, faChartLine, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
 
 // ---------------------------------------------------------------------------
 // InsertToolbar
@@ -157,7 +157,7 @@ function InsertToolbar({ active, onPrepareInsert, onCancelPlacement }: InsertToo
           </>
         )}
         <ToggleButton onClick={() => setExpanded((e) => !e)} aria-label="Insert options" aria-expanded={expanded}>
-          <FontAwesomeIcon icon={faPlus} />
+          <FontAwesomeIcon icon={expanded ? faMinus : faPlus} />
         </ToggleButton>
       </ToolbarContainer>
 

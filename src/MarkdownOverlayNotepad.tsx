@@ -1,9 +1,11 @@
 import styled from 'styled-components';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, TextField, IconButton } from '@mui/material';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import mermaid from 'mermaid';
 import { getCursorPosition, type NotepadOptions } from './Notepad';
-import { WINDOW_LINES, OVERSCAN_LINES, useMeasuredLineHeight } from './VirtualizedNotepad';
+import { WINDOW_LINES, OVERSCAN_LINES } from './VirtualizedNotepad';
 import { computeLineSegments, findChartFences, type ChartFence } from './utils/markdownTokenizer';
 import InsertToolbar from './InsertToolbar';
 
@@ -70,10 +72,17 @@ const WindowRow = styled.div<{ $top: number; $height: number }>`
 // Shared font metrics — kept identical between the overlay and the
 // textarea so highlighted text lines up exactly with the real caret
 // position underneath it (see `VirtualizedNotepad`'s analogous risk note).
+// Single source of truth for the shared 20px line grid — every layout
+// calculation in this file (chart spacer heights, chart thumbnail
+// top/height, window sizing) must use this exact constant rather than a
+// separately-measured value, or it desyncs from the real textarea/overlay
+// rows below, which always render at exactly this height per SHARED_FONT_CSS.
+const LINE_HEIGHT_PX = 20;
+
 const SHARED_FONT_CSS = `
   font-family: monospace;
   font-size: 1rem;
-  line-height: 20px;
+  line-height: ${LINE_HEIGHT_PX}px;
   padding: 0;
   margin: 0;
 `;
@@ -354,6 +363,7 @@ function ChartThumbnail({ id, source, top, heightPx, onOpenEditor }: ChartThumbn
       style={{ top, height: heightPx }}
       onClick={onOpenEditor}
       data-testid="chart-thumbnail"
+      data-line-start={id}
       role="button"
       aria-label="Edit chart"
     >
@@ -370,15 +380,20 @@ function ChartThumbnail({ id, source, top, heightPx, onOpenEditor }: ChartThumbn
 
 interface ChartEditorPopoverProps {
   fence: ChartFence | null;
-  onSave: (source: string) => void;
-  onClose: () => void;
+  // Edits are only committed to the document when the popover closes —
+  // whichever way that happens (Close button, backdrop click, or Escape,
+  // all funnel through this single handler with the latest source) — so
+  // there's no separate Save/Cancel distinction for the user to reason
+  // about, and no risk of a keystroke-by-keystroke commit racing with the
+  // fence's own startLine/endLine shifting while the popover is still open.
+  onClose: (source: string) => void;
 }
 
 // Floating popover — a MUI Dialog — positioned outside the document flow
 // entirely, so nothing about it can ever affect the overlay/textarea line
 // grid. This is the *only* place chart source text is edited; the inline
 // thumbnail is never directly editable (see EDITOR_DESIGN.md / plan).
-function ChartEditorPopover({ fence, onSave, onClose }: ChartEditorPopoverProps) {
+function ChartEditorPopover({ fence, onClose }: ChartEditorPopoverProps) {
   const [source, setSource] = useState('');
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -415,9 +430,18 @@ function ChartEditorPopover({ fence, onSave, onClose }: ChartEditorPopoverProps)
     };
   }, [fence, source]);
 
+  function handleClose() {
+    onClose(source);
+  }
+
   return (
-    <Dialog open={fence !== null} onClose={onClose} maxWidth="md" fullWidth data-testid="chart-editor-popover">
-      <DialogTitle>Edit Chart</DialogTitle>
+    <Dialog open={fence !== null} onClose={handleClose} maxWidth="md" fullWidth data-testid="chart-editor-popover">
+      <DialogTitle style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        Edit Chart
+        <IconButton onClick={handleClose} aria-label="Close" size="small" data-testid="chart-editor-close">
+          <FontAwesomeIcon icon={faXmark} />
+        </IconButton>
+      </DialogTitle>
       <DialogContent style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <TextField
           multiline
@@ -437,12 +461,6 @@ function ChartEditorPopover({ fence, onSave, onClose }: ChartEditorPopoverProps)
           )}
         </ChartPreviewPane>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => onSave(source)}>
-          Save
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 }
@@ -482,7 +500,7 @@ interface MarkdownOverlayNotepadProps {
 }
 
 const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNotepadProps) => {
-  const lineHeight = useMeasuredLineHeight();
+  const lineHeight = LINE_HEIGHT_PX;
   const [windowStart, setWindowStart] = useState(0);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -578,12 +596,19 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
     handleCursorMove(event);
   }
 
-  // Saves edited chart source from the popover back into the document,
-  // replacing the fence's full line range (opening/closing fences +
-  // inner source) with a regenerated block using the same language tag.
-  function handleSaveChart(newSource: string) {
+  // Commits the popover's edited chart source back into the document when
+  // it closes (Close button, backdrop click, or Escape all funnel here via
+  // ChartEditorPopover's onClose), replacing the fence's full line range
+  // (opening/closing fences + inner source) with a regenerated block using
+  // the same language tag. A no-op close (source unchanged) skips setLines
+  // entirely so it doesn't create a spurious undo entry.
+  function handleClosePopover(newSource: string) {
     if (!chartPopoverFence) return;
     const fence = chartPopoverFence;
+    if (newSource === fence.source) {
+      setChartPopoverFence(null);
+      return;
+    }
     const newFenceLines = [`\`\`\`${fence.lang}`, ...newSource.split('\n'), '```'];
     const nextLines = [...lines.slice(0, fence.startLine), ...newFenceLines, ...lines.slice(fence.endLine + 1)];
     setChartPopoverFence(null);
@@ -650,7 +675,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
     const segments = allLineSegments[globalIndex] ?? [{ text: line, className: '' }];
     const isActiveLine = globalIndex === activeLine;
     overlayRows.push(
-      <OverlayLine key={globalIndex}>
+      <OverlayLine key={globalIndex} data-testid="overlay-line" data-line={globalIndex}>
         {segments.map((seg, j) => {
           const classList = seg.className ? seg.className.split(' ') : [];
           const isMarker = classList.includes('md-marker');
@@ -717,6 +742,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
               ref={textAreaRef}
               data-testid="markdown-overlay-textarea"
               autoFocus
+              spellCheck={false}
               notepadWrap={options.text.notepadWrap}
               wrap={options.text.notepadWrap ? 'on' : 'off'}
               value={windowLines.join('\n')}
@@ -741,7 +767,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
           </EditorContainer>
         </WindowRow>
       </VirtualScrollContainer>
-      <StatusBar>
+      <StatusBar data-testid="markdown-overlay-status-bar">
         {cursorPosition !== null
           ? `Line ${cursorPosition.line + 1}, Col ${cursorPosition.column + 1}`
           : 'Line —, Col —'}
@@ -751,7 +777,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
         onPrepareInsert={setPendingInsertLines}
         onCancelPlacement={() => setPendingInsertLines(null)}
       />
-      <ChartEditorPopover fence={chartPopoverFence} onSave={handleSaveChart} onClose={() => setChartPopoverFence(null)} />
+      <ChartEditorPopover fence={chartPopoverFence} onClose={handleClosePopover} />
     </>
   );
 };
