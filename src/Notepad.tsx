@@ -1,4 +1,9 @@
 import styled from 'styled-components';
+import Dpad, { type DpadDirection } from './Dpad';
+import { useIsTouchDevice } from './useIsTouchDevice';
+import { useOverflow } from './useOverflow';
+import { useMeasuredCharWidth } from './useMeasuredCharWidth';
+import { useMeasuredLineHeight } from './useMeasuredLineHeight';
 import useLocalStorage from './utils/useLocalStorage';
 import { useRef, useState } from 'react';
 import {
@@ -205,6 +210,10 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
+  const isTouch = useIsTouchDevice();
+  const textAreaOverflow = useOverflow(textAreaRef, [lines]);
+  const charWidth = useMeasuredCharWidth(textAreaRef);
+  const lineHeight = useMeasuredLineHeight(textAreaRef);
 
   function handleTextChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
     const newLines = event.target.value.split('\n');
@@ -233,6 +242,25 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
     }
   }
 
+  function handleDpadScroll(direction: DpadDirection) {
+    if (!textAreaRef.current) return;
+    if (direction === 'up' || direction === 'down') {
+      const delta = direction === 'up' ? -lineHeight : lineHeight;
+      textAreaRef.current.scrollTop += delta;
+    } else {
+      const delta = direction === 'left' ? -charWidth : charWidth;
+      textAreaRef.current.scrollLeft += delta;
+    }
+  }
+
+  function handleWheel(event: React.WheelEvent<HTMLTextAreaElement>) {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      if (!textAreaRef.current) return;
+      textAreaRef.current.scrollLeft += event.deltaY;
+    }
+  }
+
   return (
     <>
       <EditorRow>
@@ -249,6 +277,7 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
           onSelect={handleCursorMove}
           onFocus={handleCursorMove}
           onScroll={handleScroll}
+          onWheel={handleWheel}
           wrap={options.text.notepadWrap ? 'on' : 'off'}
           notepadWrap={options.text.notepadWrap}
           value={lines.join('\n')}
@@ -260,6 +289,10 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
           ? `Line ${cursorPosition.line + 1}, Col ${cursorPosition.column + 1}`
           : 'Line —, Col —'}
       </StatusBar>
+      {isTouch &&
+        (textAreaOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
+          <Dpad onMove={handleDpadScroll} />
+        )}
     </>
   );
 };

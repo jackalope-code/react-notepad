@@ -4,6 +4,7 @@ import DocumentSettings from './DocumentSettings';
 import DiagnosticsPage from './DiagnosticsPage';
 import DiagnosticsBanner from './DiagnosticsBanner';
 import PersistenceBanner from './PersistenceBanner';
+import PwaReloadPrompt from './PwaReloadPrompt';
 import { useWorkspace } from './useWorkspace';
 
 // HashRouter (rather than BrowserRouter) is used because this app is
@@ -37,6 +38,7 @@ function App() {
         <Route path="/settings/:documentId" element={<DocumentSettings workspace={workspace} />} />
         <Route path="/diagnostics" element={<DiagnosticsPage />} />
       </Routes>
+      <PwaReloadPrompt />
     </HashRouter>
   );
 }

@@ -8,6 +8,10 @@ import { getCursorPosition, type NotepadOptions } from './Notepad';
 import { WINDOW_LINES, OVERSCAN_LINES } from './VirtualizedNotepad';
 import { computeLineSegments, findChartFences, type ChartFence } from './utils/markdownTokenizer';
 import InsertToolbar from './InsertToolbar';
+import Dpad, { type DpadDirection } from './Dpad';
+import { useIsTouchDevice } from './useIsTouchDevice';
+import { useOverflow } from './useOverflow';
+import { useMeasuredCharWidth } from './useMeasuredCharWidth';
 
 // ---------------------------------------------------------------------------
 // MarkdownOverlayNotepad (Phase 8.5 Part B)
@@ -277,6 +281,14 @@ const ChartThumbnailContainer = styled.div`
   & svg {
     width: 100%;
     height: 100%;
+    // Charts are preview-only here; the whole thumbnail box should open the
+    // editor, not just the visible chart shapes. Pie charts in particular can
+    // leave large transparent areas that don't bubble clicks without this.
+    pointer-events: none;
+  }
+
+  & svg * {
+    pointer-events: none;
   }
 `;
 
@@ -478,7 +490,8 @@ const TransparentTextArea = styled.textarea.withConfig({
   caret-color: black;
   border: none;
   resize: none;
-  overflow: hidden;
+  overflow-y: hidden;
+  overflow-x: ${(p) => (p.notepadWrap ? 'hidden' : 'auto')};
   white-space: ${(p) => (p.notepadWrap ? 'pre-wrap' : 'pre')};
   overflow-wrap: ${(p) => (p.notepadWrap ? 'break-word' : 'normal')};
 `;
@@ -504,7 +517,14 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   const [windowStart, setWindowStart] = useState(0);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
+
+  const isTouch = useIsTouchDevice();
+  const containerOverflow = useOverflow(scrollContainerRef, [lines]);
+  const textAreaOverflow = useOverflow(textAreaRef, [lines, windowStart]);
+  const charWidth = useMeasuredCharWidth(textAreaRef);
 
   // Set while the user is in "placement mode" after choosing a table size
   // or chart type from InsertToolbar — the next click/tap in the document
@@ -579,6 +599,41 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
       line: effectiveWindowStart + positionInWindow.line,
       column: positionInWindow.column,
     });
+  }
+
+  // D-pad and wheel helpers for the overlay editor. The d-pad scrolls the
+  // virtualized container vertically and the textarea/overlay horizontally.
+  // Ctrl+wheel is remapped to horizontal scroll on the textarea.
+  function handleDpadScroll(direction: DpadDirection) {
+    if (direction === 'up' || direction === 'down') {
+      if (!scrollContainerRef.current) return;
+      const delta = direction === 'up' ? -lineHeight : lineHeight;
+      scrollContainerRef.current.scrollTop += delta;
+    } else {
+      if (!textAreaRef.current) return;
+      const delta = direction === 'left' ? -charWidth : charWidth;
+      textAreaRef.current.scrollLeft += delta;
+      if (overlayRef.current) {
+        overlayRef.current.scrollLeft = textAreaRef.current.scrollLeft;
+      }
+    }
+  }
+
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      if (!textAreaRef.current) return;
+      textAreaRef.current.scrollLeft += event.deltaY;
+      if (overlayRef.current) {
+        overlayRef.current.scrollLeft = textAreaRef.current.scrollLeft;
+      }
+    }
+  }
+
+  function handleTextAreaScroll() {
+    if (overlayRef.current && textAreaRef.current) {
+      overlayRef.current.scrollLeft = textAreaRef.current.scrollLeft;
+    }
   }
 
   // While in placement mode (a table/chart has been chosen from
@@ -719,7 +774,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
 
   return (
     <>
-      <VirtualScrollContainer onScroll={handleScroll} data-testid="virtual-scroll-container">
+      <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} onWheel={handleWheel} data-testid="virtual-scroll-container">
         <Sizer $height={lines.length * lineHeight} />
         <WindowRow $top={effectiveWindowStart * lineHeight} $height={windowHeight}>
           {options.text.showLineNumbers && (
@@ -732,6 +787,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
           )}
           <EditorContainer>
             <HighlightOverlay
+              ref={overlayRef}
               notepadWrap={options.text.notepadWrap}
               aria-hidden="true"
               data-testid="markdown-overlay"
@@ -750,6 +806,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
               onKeyUp={handleCursorMove}
               onClick={handleTextAreaClick}
               onSelect={handleCursorMove}
+              onScroll={handleTextAreaScroll}
               onTouchEnd={() => setTimeout(() => selectionHandlerRef.current(), 0)}
             />
             <ChartOverlayLayer>
@@ -777,6 +834,9 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
         onPrepareInsert={setPendingInsertLines}
         onCancelPlacement={() => setPendingInsertLines(null)}
       />
+      {isTouch && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
+        <Dpad onMove={handleDpadScroll} />
+      )}
       <ChartEditorPopover fence={chartPopoverFence} onClose={handleClosePopover} />
     </>
   );

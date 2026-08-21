@@ -1,6 +1,10 @@
 import styled from 'styled-components';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getCursorPosition, type NotepadOptions } from './Notepad';
+import Dpad, { type DpadDirection } from './Dpad';
+import { useIsTouchDevice } from './useIsTouchDevice';
+import { useOverflow } from './useOverflow';
+import { useMeasuredCharWidth } from './useMeasuredCharWidth';
 
 // ---------------------------------------------------------------------------
 // VirtualizedNotepad (Phase 13)
@@ -105,7 +109,8 @@ const OverlayTextArea = styled.textarea.withConfig({
   min-height: 100dvh;
   border: none;
   resize: none;
-  overflow: hidden;
+  overflow-y: hidden;
+  overflow-x: ${(p) => (p.notepadWrap ? 'hidden' : 'auto')};
   padding: 0;
   font-family: monospace;
   white-space: ${(p) => (p.notepadWrap ? 'pre-wrap' : 'pre')};
@@ -133,7 +138,12 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
   const [windowStart, setWindowStart] = useState(0);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
+  const isTouch = useIsTouchDevice();
+  const containerOverflow = useOverflow(scrollContainerRef, [lines]);
+  const textAreaOverflow = useOverflow(textAreaRef, [lines, windowStart]);
+  const charWidth = useMeasuredCharWidth(textAreaRef);
 
   // Defensive clamp for render/edit math: if `lines` shrank (e.g. after an
   // undo) further than the last scroll-driven `windowStart`, don't let the
@@ -204,11 +214,31 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
     });
   }
 
+  function handleDpadScroll(direction: DpadDirection) {
+    if (direction === 'up' || direction === 'down') {
+      if (!scrollContainerRef.current) return;
+      const delta = direction === 'up' ? -lineHeight : lineHeight;
+      scrollContainerRef.current.scrollTop += delta;
+    } else {
+      if (!textAreaRef.current) return;
+      const delta = direction === 'left' ? -charWidth : charWidth;
+      textAreaRef.current.scrollLeft += delta;
+    }
+  }
+
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      if (!textAreaRef.current) return;
+      textAreaRef.current.scrollLeft += event.deltaY;
+    }
+  }
+
   const windowHeight = Math.max(windowLines.length, 1) * lineHeight;
 
   return (
     <>
-      <VirtualScrollContainer onScroll={handleScroll} data-testid="virtual-scroll-container">
+      <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} onWheel={handleWheel} data-testid="virtual-scroll-container">
         <Sizer $height={lines.length * lineHeight} />
         <WindowRow $top={effectiveWindowStart * lineHeight}>
           {options.text.showLineNumbers && (
@@ -232,6 +262,9 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
           />
         </WindowRow>
       </VirtualScrollContainer>
+      {isTouch && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
+        <Dpad onMove={handleDpadScroll} />
+      )}
       <StatusBar>
         {cursorPosition !== null
           ? `Line ${cursorPosition.line + 1}, Col ${cursorPosition.column + 1}`

@@ -1,8 +1,27 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react-swc';
 
+// Vitest cannot load the VitePWA `virtual:pwa-register` module because the
+// PWA plugin is not part of the test build. This tiny plugin intercepts it
+// and provides a no-op registration function so the component can render in
+// jsdom without trying to register a real service worker.
+const pwaStubPlugin = {
+  name: 'pwa-stub',
+  enforce: 'pre' as const,
+  resolveId(source: string) {
+    if (source === 'virtual:pwa-register') {
+      return '\0virtual:pwa-register';
+    }
+  },
+  load(id: string) {
+    if (id === '\0virtual:pwa-register') {
+      return `export function registerSW() { return () => Promise.resolve(); }`;
+    }
+  },
+};
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), pwaStubPlugin],
   test: {
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
