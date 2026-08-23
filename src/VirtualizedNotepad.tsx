@@ -67,7 +67,9 @@ function useMeasuredLineHeight(): number {
 const VirtualScrollContainer = styled.div`
   position: relative;
   width: 100%;
+  min-width: 0;
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 `;
@@ -80,6 +82,7 @@ const Sizer = styled.div<{ $height: number }>`
 const WindowRow = styled.div<{ $top: number }>`
   position: absolute;
   top: ${(p) => p.$top}px;
+  min-width: 0;
   left: 0;
   width: 100%;
   display: flex;
@@ -105,6 +108,7 @@ const OverlayTextArea = styled.textarea.withConfig({
   shouldForwardProp: (prop) => prop !== 'notepadWrap' && prop !== '$height',
 })<OverlayTextAreaProps>`
   flex: 1 1 auto;
+  min-width: 0;
   height: ${(p) => p.$height}px;
   min-height: 100%;
   border: none;
@@ -339,7 +343,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
         </WindowRow>
       </VirtualScrollContainer>
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '228px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '202px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad

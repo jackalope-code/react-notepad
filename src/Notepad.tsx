@@ -29,6 +29,7 @@ const StyledTextArea = styled.textarea.withConfig({
   shouldForwardProp: (prop) => prop !== 'notepadWrap',
 })<TextAreaProps>`
     width: 100%;
+    min-width: 0;
     height: 100%;
     overflow-y: scroll;
     overflow-x: ${(props) => (props.notepadWrap ? 'hidden' : 'scroll')};
@@ -183,8 +184,10 @@ const EditorRow = styled.div`
   display: flex;
   align-items: stretch;
   width: 100%;
+  min-width: 0;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 `;
 
 const LineNumberGutter = styled.div`
@@ -353,7 +356,7 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
           : 'Line —, Col —'}
       </StatusBar>
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '228px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '202px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (textAreaOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad

@@ -4,14 +4,17 @@ import { faArrowUp, faArrowDown, faArrowLeft, faArrowRight } from '@fortawesome/
 import { useRef } from 'react';
 import { useScrollRepeat } from './useScrollRepeat';
 
+const DPAD_GAP = 6;
+const DPAD_BUTTON_SIZE = 48;
+
 const DpadContainer = styled.div`
   position: fixed;
-  bottom: 32px;
-  right: 12px;
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  right: max(8px, env(safe-area-inset-right, 0px));
   display: grid;
-  grid-template-columns: 56px 56px 56px;
-  grid-template-rows: 56px 56px 56px;
-  gap: 6px;
+  grid-template-columns: ${DPAD_BUTTON_SIZE}px ${DPAD_BUTTON_SIZE}px ${DPAD_BUTTON_SIZE}px;
+  grid-template-rows: ${DPAD_BUTTON_SIZE}px ${DPAD_BUTTON_SIZE}px ${DPAD_BUTTON_SIZE}px;
+  gap: ${DPAD_GAP}px;
   z-index: 20;
   /* Transparent/borderless so the panel itself never obscures the
      document underneath it — only the individual buttons are visible. */
@@ -20,6 +23,9 @@ const DpadContainer = styled.div`
   border-radius: 12px;
   padding: 0;
   box-shadow: none;
+  /* Keep the D-pad from pushing or clipping on small viewports. */
+  max-width: calc(100vw - max(8px, env(safe-area-inset-right, 0px)) - 4px);
+  box-sizing: border-box;
 `;
 
 const DpadButton = styled.button`
@@ -33,9 +39,9 @@ const DpadButton = styled.button`
   background: rgba(248, 250, 252, 0.9);
   color: #334155;
   cursor: pointer;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-  touch-action: manipulation;
+  touch-action: none;
 
   &:hover {
     background: #e2e8f0;
@@ -90,19 +96,27 @@ export default function Dpad({
     return {
       'aria-label': direction,
       'data-testid': `${testId}-${direction}`,
-      onPointerDown: () => {
+      onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
+        // Prevent the button from stealing focus from the editor; the editor
+        // already restores focus inside its onMove handler.
+        event.preventDefault();
+        event.stopPropagation();
         isPointerRef.current = true;
         directionRef.current = direction;
         onMove(direction);
         start();
       },
-      onPointerUp: () => {
+      onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
         stop();
       },
-      onPointerLeave: () => {
+      onPointerLeave: (event: React.PointerEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
         stop();
       },
-      onClick: () => {
+      onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
         if (isPointerRef.current) {
           isPointerRef.current = false;
           return;

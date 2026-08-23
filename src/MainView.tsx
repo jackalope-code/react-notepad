@@ -30,8 +30,12 @@ const TitleInput = styled.input`
 const Main = styled.div`
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
   height: 100dvh;
-  max-width: 100vw;
+  height: 100svh;
+  max-width: 100%;
   overflow: hidden;
 `;
 
@@ -44,8 +48,11 @@ const Main = styled.div`
 const EditorSlot = styled.div`
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 `;
 
 function downloadTextFile(filename: string, content: string) {

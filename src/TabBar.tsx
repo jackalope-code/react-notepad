@@ -19,6 +19,10 @@ interface TabBarProps {
 const TabBarOuter = styled.div`
   display: flex;
   align-items: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   background-color: #f0f0f0;
   border-bottom: 1px solid lightslategray;
 `;
@@ -31,7 +35,7 @@ const TabList = styled.div`
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  touch-action: pan-y;
+  touch-action: pan-x;
   &::-webkit-scrollbar {
     display: none;
   }
@@ -40,6 +44,7 @@ const TabList = styled.div`
 const Tab = styled.div<{ $active: boolean }>`
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 6px;
   padding: 8px 12px;
   cursor: pointer;
@@ -76,6 +81,7 @@ const SettingsButton = styled.button`
 
 const AddButton = styled.button`
   margin-left: 4px;
+  flex: 0 0 auto;
 `;
 
 const ArrowContainer = styled.div`

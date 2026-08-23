@@ -52,7 +52,9 @@ import { useMeasuredCharWidth } from './useMeasuredCharWidth';
 const VirtualScrollContainer = styled.div`
   position: relative;
   width: 100%;
+  min-width: 0;
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 `;
@@ -65,6 +67,7 @@ const Sizer = styled.div<{ $height: number }>`
 const WindowRow = styled.div<{ $top: number; $height: number }>`
   position: absolute;
   top: ${(p) => p.$top}px;
+  min-width: 0;
   left: 0;
   width: 100%;
   height: ${(p) => p.$height}px;
@@ -488,6 +491,7 @@ function ChartEditorPopover({ fence, onClose }: ChartEditorPopoverProps) {
 const TransparentTextArea = styled.textarea.withConfig({
   shouldForwardProp: (prop) => prop !== 'notepadWrap',
 })<WrapProps>`
+  min-width: 0;
   position: absolute;
   inset: 0;
   width: 100%;
@@ -937,7 +941,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
         onCancelPlacement={() => setPendingInsertLines(null)}
       />
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '228px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '202px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad
