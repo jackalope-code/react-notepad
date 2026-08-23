@@ -31,15 +31,17 @@ interface DocumentSettingsProps {
 function DocumentSettings({ workspace }: DocumentSettingsProps) {
   const { documentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
-  const { loading, documents, setMarkdownEnabled } = workspace;
+  const { loading, documents, setMarkdownEnabled, setOptions } = workspace;
 
   const doc = documents.find((d) => d.id === documentId);
 
-  // Pending (unsaved) state for the toggle, initialized once the document
+  // Pending (unsaved) state for the toggles, initialized once the document
   // is found; Save persists it, Back discards it. Since `document` may be
   // undefined until the workspace finishes loading, this is initialized
   // lazily from the document once available rather than eagerly.
   const [pendingMarkdownEnabled, setPendingMarkdownEnabled] = useState<boolean | null>(null);
+  const [pendingDpadShowCaret, setPendingDpadShowCaret] = useState<boolean | null>(null);
+  const [pendingDpadShowScroll, setPendingDpadShowScroll] = useState<boolean | null>(null);
 
   if (loading) {
     return (
@@ -61,8 +63,14 @@ function DocumentSettings({ workspace }: DocumentSettingsProps) {
   }
 
   const markdownEnabled = pendingMarkdownEnabled ?? doc.markdownEnabled;
+  const dpadShowCaret = pendingDpadShowCaret ?? doc.options.dpad?.showCaret ?? true;
+  const dpadShowScroll = pendingDpadShowScroll ?? doc.options.dpad?.showScroll ?? true;
 
   function handleSave() {
+    const nextDpad = { showCaret: dpadShowCaret, showScroll: dpadShowScroll };
+    documents.forEach((d) => {
+      setOptions(d.id, { ...d.options, dpad: nextDpad });
+    });
     setMarkdownEnabled(doc!.id, markdownEnabled);
     navigate('/');
   }
@@ -87,6 +95,24 @@ function DocumentSettings({ workspace }: DocumentSettingsProps) {
             onChange={(e) => setPendingMarkdownEnabled(e.currentTarget.checked)}
           />
           <label htmlFor="input-settings-markdown-enabled">Live Markdown Rendering</label>
+        </SettingsRow>
+        <SettingsRow>
+          <input
+            id="input-settings-dpad-caret"
+            type="checkbox"
+            checked={dpadShowCaret}
+            onChange={(e) => setPendingDpadShowCaret(e.currentTarget.checked)}
+          />
+          <label htmlFor="input-settings-dpad-caret">Show caret d-pad</label>
+        </SettingsRow>
+        <SettingsRow>
+          <input
+            id="input-settings-dpad-scroll"
+            type="checkbox"
+            checked={dpadShowScroll}
+            onChange={(e) => setPendingDpadShowScroll(e.currentTarget.checked)}
+          />
+          <label htmlFor="input-settings-dpad-scroll">Show scroll d-pad</label>
         </SettingsRow>
         <ButtonRow>
           <button onClick={handleSave} aria-label="Save">Save</button>

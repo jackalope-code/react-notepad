@@ -140,6 +140,8 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
+  const pendingDpadTargetRef = useRef<{ line: number; column: number } | null>(null);
+  const desiredColumnRef = useRef<number | null>(null);
   const isTouch = useIsTouchDevice();
   const containerOverflow = useOverflow(scrollContainerRef, [lines]);
   const textAreaOverflow = useOverflow(textAreaRef, [lines, windowStart]);
@@ -182,6 +184,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
     const positionInWindow = getCursorPosition(newWindowLines, event.target.selectionStart);
     const cursorLine = effectiveWindowStart + positionInWindow.line;
     setCursorPosition({ line: cursorLine, column: positionInWindow.column });
+    desiredColumnRef.current = positionInWindow.column;
     pendingSelectionRef.current = event.target.selectionStart;
     setLines(nextLines, cursorLine);
   }
@@ -199,6 +202,22 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
       textAreaRef.current.selectionEnd = pos;
       pendingSelectionRef.current = null;
     }
+
+    if (pendingDpadTargetRef.current && textAreaRef.current) {
+      const { line, column } = pendingDpadTargetRef.current;
+      if (line >= effectiveWindowStart && line < windowEnd) {
+        const targetWindowLines = lines.slice(effectiveWindowStart, windowEnd);
+        let index = 0;
+        for (let i = 0; i < line - effectiveWindowStart; i++) {
+          index += targetWindowLines[i].length + 1;
+        }
+        index += Math.min(column, targetWindowLines[line - effectiveWindowStart]?.length ?? 0);
+        textAreaRef.current.selectionStart = index;
+        textAreaRef.current.selectionEnd = index;
+        setCursorPosition({ line, column });
+        pendingDpadTargetRef.current = null;
+      }
+    }
   });
 
   function handleCursorMove(
@@ -212,6 +231,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
       line: effectiveWindowStart + positionInWindow.line,
       column: positionInWindow.column,
     });
+    desiredColumnRef.current = positionInWindow.column;
   }
 
   function handleDpadScroll(direction: DpadDirection) {
@@ -223,6 +243,60 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
       if (!textAreaRef.current) return;
       const delta = direction === 'left' ? -charWidth : charWidth;
       textAreaRef.current.scrollLeft += delta;
+    }
+  }
+
+  function handleDpadMove(direction: DpadDirection) {
+    const current = cursorPosition ?? { line: effectiveWindowStart, column: 0 };
+    let targetLine = current.line;
+    let targetColumn = current.column;
+    desiredColumnRef.current ??= current.column;
+
+    switch (direction) {
+      case 'left':
+        if (targetColumn > 0) {
+          targetColumn--;
+        } else if (targetLine > 0) {
+          targetLine--;
+          targetColumn = lines[targetLine].length;
+        }
+        desiredColumnRef.current = targetColumn;
+        break;
+      case 'right':
+        if (targetColumn < (lines[targetLine]?.length ?? 0)) {
+          targetColumn++;
+        } else if (targetLine < lines.length - 1) {
+          targetLine++;
+          targetColumn = 0;
+        }
+        desiredColumnRef.current = targetColumn;
+        break;
+      case 'up':
+        if (targetLine > 0) {
+          targetLine--;
+          targetColumn = Math.min(desiredColumnRef.current ?? 0, lines[targetLine].length);
+        }
+        break;
+      case 'down':
+        if (targetLine < lines.length - 1) {
+          targetLine++;
+          targetColumn = Math.min(desiredColumnRef.current ?? 0, lines[targetLine].length);
+        }
+        break;
+    }
+
+    if (targetLine === current.line && targetColumn === current.column) return;
+
+    pendingDpadTargetRef.current = { line: targetLine, column: targetColumn };
+
+    const isInWindow = targetLine >= effectiveWindowStart && targetLine < windowEnd;
+    if (!isInWindow) {
+      const maxStart = Math.max(0, lines.length - WINDOW_LINES);
+      const newStart = Math.max(0, Math.min(targetLine - OVERSCAN_LINES, maxStart));
+      setWindowStart(newStart);
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = targetLine * lineHeight;
+      }
     }
   }
 
@@ -262,8 +336,20 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
           />
         </WindowRow>
       </VirtualScrollContainer>
-      {isTouch && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
-        <Dpad onMove={handleDpadScroll} />
+      {isTouch && options.dpad?.showCaret !== false && (
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ right: 'auto', left: '12px' }} />
+      )}
+      {isTouch && options.dpad?.showScroll !== false && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
+        <Dpad
+          onMove={handleDpadScroll}
+          testId="dpad-scroll"
+          enabled={{
+            up: containerOverflow.hasVerticalOverflow,
+            down: containerOverflow.hasVerticalOverflow,
+            left: textAreaOverflow.hasHorizontalOverflow,
+            right: textAreaOverflow.hasHorizontalOverflow,
+          }}
+        />
       )}
       <StatusBar>
         {cursorPosition !== null

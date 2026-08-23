@@ -184,7 +184,7 @@ describe('useNotepad', () => {
   it('recovers to default options when localStorage options is corrupted JSON', () => {
     localStorage.setItem('react-notepad-options', '{not valid json');
     const { result } = renderHook(() => useNotepad());
-    expect(result.current.options).toEqual({ text: { notepadWrap: true } });
+    expect(result.current.options).toEqual({ text: { notepadWrap: true }, dpad: { showCaret: true, showScroll: true } });
   });
 
   it('recovers to default title when localStorage title JSON has version 2 but missing title field', () => {

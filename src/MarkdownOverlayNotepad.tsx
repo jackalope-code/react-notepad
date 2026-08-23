@@ -289,6 +289,14 @@ const ChartThumbnailContainer = styled.div`
 
   & svg * {
     pointer-events: none;
+    // Charts are preview-only here; the whole thumbnail box should open the
+    // editor, not just the visible chart shapes. Pie charts in particular can
+    // leave large transparent areas that don't bubble clicks without this.
+    pointer-events: none;
+  }
+
+  & svg * {
+    pointer-events: none;
   }
 `;
 
@@ -520,6 +528,8 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
+  const pendingDpadTargetRef = useRef<{ line: number; column: number } | null>(null);
+  const desiredColumnRef = useRef<number | null>(null);
 
   const isTouch = useIsTouchDevice();
   const containerOverflow = useOverflow(scrollContainerRef, [lines]);
@@ -569,6 +579,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
     const positionInWindow = getCursorPosition(newWindowLines, event.target.selectionStart);
     const cursorLine = effectiveWindowStart + positionInWindow.line;
     setCursorPosition({ line: cursorLine, column: positionInWindow.column });
+    desiredColumnRef.current = positionInWindow.column;
     pendingSelectionRef.current = event.target.selectionStart;
     setLines(nextLines, cursorLine);
   }
@@ -586,6 +597,23 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
       textAreaRef.current.selectionEnd = pos;
       pendingSelectionRef.current = null;
     }
+
+    if (pendingDpadTargetRef.current && textAreaRef.current) {
+      const { line, column } = pendingDpadTargetRef.current;
+      if (line >= effectiveWindowStart && line < windowEnd) {
+        const targetWindowLines = lines.slice(effectiveWindowStart, windowEnd);
+        let index = 0;
+        for (let i = 0; i < line - effectiveWindowStart; i++) {
+          index += targetWindowLines[i].length + 1;
+        }
+        const targetLineText = targetWindowLines[line - effectiveWindowStart] ?? '';
+        index += Math.min(column, targetLineText.length);
+        textAreaRef.current.selectionStart = index;
+        textAreaRef.current.selectionEnd = index;
+        setCursorPosition({ line, column });
+        pendingDpadTargetRef.current = null;
+      }
+    }
   });
 
   function handleCursorMove(
@@ -599,6 +627,79 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
       line: effectiveWindowStart + positionInWindow.line,
       column: positionInWindow.column,
     });
+    desiredColumnRef.current = positionInWindow.column;
+  }
+
+  // D-pad movement: translate a directional click into a target logical
+  // (line, column). If the target is already inside the visible window we
+  // apply it immediately; otherwise we shift the virtualized window and let
+  // the layout effect place the caret on the next render.
+  function handleDpadMove(direction: DpadDirection) {
+    const current = cursorPosition ?? { line: effectiveWindowStart, column: 0 };
+    let targetLine = current.line;
+    let targetColumn = current.column;
+    const desiredColumn = desiredColumnRef.current ?? current.column;
+
+    switch (direction) {
+      case 'left':
+        if (targetColumn > 0) {
+          targetColumn--;
+        } else if (targetLine > 0) {
+          targetLine--;
+          targetColumn = lines[targetLine].length;
+        }
+        desiredColumnRef.current = targetColumn;
+        break;
+      case 'right':
+        if (targetColumn < (lines[targetLine]?.length ?? 0)) {
+          targetColumn++;
+        } else if (targetLine < lines.length - 1) {
+          targetLine++;
+          targetColumn = 0;
+        }
+        desiredColumnRef.current = targetColumn;
+        break;
+      case 'up':
+        if (targetLine > 0) {
+          targetLine--;
+          targetColumn = Math.min(desiredColumn, lines[targetLine].length);
+        }
+        break;
+      case 'down':
+        if (targetLine < lines.length - 1) {
+          targetLine++;
+          targetColumn = Math.min(desiredColumn, lines[targetLine].length);
+        }
+        break;
+    }
+
+    if (targetLine === current.line && targetColumn === current.column) {
+      return;
+    }
+
+    const isInWindow = targetLine >= effectiveWindowStart && targetLine < windowEnd;
+    if (isInWindow) {
+      const targetWindowLines = lines.slice(effectiveWindowStart, windowEnd);
+      let index = 0;
+      for (let i = 0; i < targetLine - effectiveWindowStart; i++) {
+        index += targetWindowLines[i].length + 1;
+      }
+      const targetLineText = targetWindowLines[targetLine - effectiveWindowStart] ?? '';
+      index += Math.min(targetColumn, targetLineText.length);
+      if (textAreaRef.current) {
+        textAreaRef.current.selectionStart = index;
+        textAreaRef.current.selectionEnd = index;
+      }
+      setCursorPosition({ line: targetLine, column: targetColumn });
+    } else {
+      pendingDpadTargetRef.current = { line: targetLine, column: targetColumn };
+      const maxStart = Math.max(0, lines.length - WINDOW_LINES);
+      const newStart = Math.max(0, Math.min(targetLine - OVERSCAN_LINES, maxStart));
+      setWindowStart(newStart);
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = targetLine * lineHeight;
+      }
+    }
   }
 
   // D-pad and wheel helpers for the overlay editor. The d-pad scrolls the
@@ -774,7 +875,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
 
   return (
     <>
-      <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} onWheel={handleWheel} data-testid="virtual-scroll-container">
+      <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} data-testid="virtual-scroll-container">
         <Sizer $height={lines.length * lineHeight} />
         <WindowRow $top={effectiveWindowStart * lineHeight} $height={windowHeight}>
           {options.text.showLineNumbers && (
@@ -834,8 +935,20 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
         onPrepareInsert={setPendingInsertLines}
         onCancelPlacement={() => setPendingInsertLines(null)}
       />
-      {isTouch && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
-        <Dpad onMove={handleDpadScroll} />
+      {isTouch && options.dpad?.showCaret !== false && (
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ right: 'auto', left: '12px' }} />
+      )}
+      {isTouch && options.dpad?.showScroll !== false && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
+        <Dpad
+          onMove={handleDpadScroll}
+          testId="dpad-scroll"
+          enabled={{
+            up: containerOverflow.hasVerticalOverflow,
+            down: containerOverflow.hasVerticalOverflow,
+            left: textAreaOverflow.hasHorizontalOverflow,
+            right: textAreaOverflow.hasHorizontalOverflow,
+          }}
+        />
       )}
       <ChartEditorPopover fence={chartPopoverFence} onClose={handleClosePopover} />
     </>

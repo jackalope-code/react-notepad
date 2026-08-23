@@ -16,7 +16,7 @@ const LEGACY_TEXT_KEY = 'react-notepad-text';
 const LEGACY_TITLE_KEY = 'react-notepad-title';
 const LEGACY_OPTIONS_KEY = 'react-notepad-options';
 
-const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true } };
+const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true }, dpad: { showCaret: true, showScroll: true } };
 
 const PERSIST_DEBOUNCE_MS = 300;
 

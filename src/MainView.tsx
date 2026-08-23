@@ -27,6 +27,12 @@ const TitleInput = styled.input`
   font-weight: 600;
 `;
 
+const Main = styled.div`
+  height: 100dvh;
+  max-width: 100vw;
+  overflow: hidden;
+`;
+
 function downloadTextFile(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
@@ -117,56 +123,58 @@ function MainView({ workspace }: MainViewProps) {
 
   return (
     <>
-      <NavBar>
-          <span>react-notepad</span>
-          <a href="https://github.com/jackalope-code/react-notepad"><FontAwesomeIcon icon={faGithub} className="icon"/></a>
-      </NavBar>
-      <TabBar
-        documents={documents}
-        activeDocumentId={activeDocument.id}
-        onSelect={setActiveDocumentId}
-        onClose={closeDocument}
-        onAddClick={() => setNewDocDialogOpen(true)}
-        onSettingsClick={handleSettingsClick}
-      />
-      <div className="toolbar">
-        <button onClick={handleUndoClicked} disabled={!canUndo} aria-label="Undo">
-          <FontAwesomeIcon icon={faRotateLeft} /> Undo
-        </button>
-        <button onClick={handleRedoClicked} disabled={!canRedo} aria-label="Redo">
-          <FontAwesomeIcon icon={faRotateRight} /> Redo
-        </button>
-        <input id="input-toolbar-wrap-text" type="checkbox" name="input-toolbar-wrap-text" checked={activeDocument.options.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>
-        <label htmlFor="input-toolbar-wrap-text">Wrap text</label>
-        <input id="input-toolbar-line-numbers" type="checkbox" name="input-toolbar-line-numbers" checked={!!activeDocument.options.text.showLineNumbers} onChange={(e) => handleOptionChanged("options.text.showLineNumbers", e)}/>
-        <label htmlFor="input-toolbar-line-numbers">Line numbers</label>
-        <button onClick={() => setExportDialogOpen(true)} aria-label="Save as file">
-          <FontAwesomeIcon icon={faFileExport} /> Save as file
-        </button>
-      </div>
-      <TitleInput className="title" type="text" onChange={(e) => setTitle(activeDocument!.id, e.currentTarget.value)} value={activeDocument.title} />
-      {activeDocument.markdownEnabled ? (
-        <MarkdownOverlayNotepad
-          key={activeDocument.id}
-          lines={activeDocument.lines}
-          setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
-          options={activeDocument.options}
+      <Main>
+        <NavBar>
+            <span>react-notepad</span>
+            <a href="https://github.com/jackalope-code/react-notepad"><FontAwesomeIcon icon={faGithub} className="icon"/></a>
+        </NavBar>
+        <TabBar
+          documents={documents}
+          activeDocumentId={activeDocument.id}
+          onSelect={setActiveDocumentId}
+          onClose={closeDocument}
+          onAddClick={() => setNewDocDialogOpen(true)}
+          onSettingsClick={handleSettingsClick}
         />
-      ) : USE_VIRTUALIZED_EDITOR ? (
-        <VirtualizedNotepad
-          key={activeDocument.id}
-          lines={activeDocument.lines}
-          setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
-          options={activeDocument.options}
-        />
-      ) : (
-        <Notepad
-          key={activeDocument.id}
-          lines={activeDocument.lines}
-          setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
-          options={activeDocument.options}
-        />
-      )}
+        <div className="toolbar">
+          <button onClick={handleUndoClicked} disabled={!canUndo} aria-label="Undo">
+            <FontAwesomeIcon icon={faRotateLeft} /> Undo
+          </button>
+          <button onClick={handleRedoClicked} disabled={!canRedo} aria-label="Redo">
+            <FontAwesomeIcon icon={faRotateRight} /> Redo
+          </button>
+          <input id="input-toolbar-wrap-text" type="checkbox" name="input-toolbar-wrap-text" checked={activeDocument.options.text.notepadWrap} onChange={(e) => handleOptionChanged("options.text.notepadWrap", e)}/>
+          <label htmlFor="input-toolbar-wrap-text">Wrap text</label>
+          <input id="input-toolbar-line-numbers" type="checkbox" name="input-toolbar-line-numbers" checked={!!activeDocument.options.text.showLineNumbers} onChange={(e) => handleOptionChanged("options.text.showLineNumbers", e)}/>
+          <label htmlFor="input-toolbar-line-numbers">Line numbers</label>
+          <button onClick={() => setExportDialogOpen(true)} aria-label="Save as file">
+            <FontAwesomeIcon icon={faFileExport} /> Save as file
+          </button>
+        </div>
+        <TitleInput className="title" type="text" onChange={(e) => setTitle(activeDocument!.id, e.currentTarget.value)} value={activeDocument.title} />
+        {activeDocument.markdownEnabled ? (
+          <MarkdownOverlayNotepad
+            key={activeDocument.id}
+            lines={activeDocument.lines}
+            setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
+            options={activeDocument.options}
+          />
+        ) : USE_VIRTUALIZED_EDITOR ? (
+          <VirtualizedNotepad
+            key={activeDocument.id}
+            lines={activeDocument.lines}
+            setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
+            options={activeDocument.options}
+          />
+        ) : (
+          <Notepad
+            key={activeDocument.id}
+            lines={activeDocument.lines}
+            setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
+            options={activeDocument.options}
+          />
+        )}
+      </Main>
       <Footer />
       <NewDocumentDialog
         open={newDocDialogOpen}

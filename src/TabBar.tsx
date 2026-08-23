@@ -30,6 +30,7 @@ const TabList = styled.div`
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  touch-action: pan-y;
   &::-webkit-scrollbar {
     display: none;
   }
@@ -88,12 +89,36 @@ const TAB_SCROLL_STEP = 100;
 
 function TabBar({ documents, activeDocumentId, onSelect, onClose, onAddClick, onSettingsClick }: TabBarProps) {
   const tabListRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const scrollStartX = useRef(0);
   const isTouch = useIsTouchDevice();
   const tabOverflow = useOverflow(tabListRef, [documents]);
 
+  function handleTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    touchStartX.current = event.touches[0].clientX;
+    scrollStartX.current = tabListRef.current?.scrollLeft ?? 0;
+  }
+
+  function handleTouchMove(event: React.TouchEvent<HTMLDivElement>) {
+    if (touchStartX.current === null || !tabListRef.current) return;
+    const dx = event.touches[0].clientX - touchStartX.current;
+    tabListRef.current.scrollLeft = scrollStartX.current - dx;
+  }
+
+  function handleTouchEnd() {
+    touchStartX.current = null;
+  }
+
   return (
     <TabBarOuter>
-      <TabList ref={tabListRef} role="tablist" data-testid="tab-list">
+      <TabList
+        ref={tabListRef}
+        role="tablist"
+        data-testid="tab-list"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {documents.map((doc) => (
           <Tab
             key={doc.id}

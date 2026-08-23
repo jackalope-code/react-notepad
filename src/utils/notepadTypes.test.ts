@@ -211,7 +211,7 @@ describe('parseTitle', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseOptions', () => {
-  const defaultOpts: NotepadOptions = { text: { notepadWrap: true } };
+  const defaultOpts: NotepadOptions = { text: { notepadWrap: true }, dpad: { showCaret: true, showScroll: true } };
 
   it('parses v2 JSON', () => {
     const opts: NotepadOptions = { text: { notepadWrap: false } };
@@ -366,7 +366,7 @@ describe('migrateV1toV2', () => {
       version: 2,
       lines: [''],
       title: 'Title',
-      options: { text: { notepadWrap: true } },
+      options: { text: { notepadWrap: true }, dpad: { showCaret: true, showScroll: true } },
     });
   });
 

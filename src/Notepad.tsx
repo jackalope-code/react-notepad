@@ -45,9 +45,13 @@ export interface NotepadOptions {
     notepadWrap: boolean;
     showLineNumbers?: boolean;
   };
+  dpad?: {
+    showCaret: boolean;
+    showScroll: boolean;
+  };
 }
 
-const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true, showLineNumbers: false } };
+const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true, showLineNumbers: false }, dpad: { showCaret: true, showScroll: true } };
 
 // ---------------------------------------------------------------------------
 // getCursorLine helper (exported for testing)
@@ -209,6 +213,7 @@ const StatusBar = styled.div`
 const Notepad = ({ lines, setLines, options }: NotepadProps) => {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
+  const desiredColumnRef = useRef<number | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
   const isTouch = useIsTouchDevice();
   const textAreaOverflow = useOverflow(textAreaRef, [lines]);
@@ -217,9 +222,10 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
 
   function handleTextChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
     const newLines = event.target.value.split('\n');
-    const cursorLine = getCursorLine(newLines, event.target.selectionStart);
-    setCursorPosition(getCursorPosition(newLines, event.target.selectionStart));
-    setLines(newLines, cursorLine);
+    const newPosition = getCursorPosition(newLines, event.target.selectionStart);
+    setCursorPosition(newPosition);
+    desiredColumnRef.current = newPosition.column;
+    setLines(newLines, newPosition.line);
   }
 
   // Reads the cursor position from currentTarget.selectionStart. Bound to
@@ -233,7 +239,9 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
       | React.MouseEvent<HTMLTextAreaElement>
       | React.SyntheticEvent<HTMLTextAreaElement>,
   ) {
-    setCursorPosition(getCursorPosition(lines, event.currentTarget.selectionStart));
+    const newPosition = getCursorPosition(lines, event.currentTarget.selectionStart);
+    setCursorPosition(newPosition);
+    desiredColumnRef.current = newPosition.column;
   }
 
   function handleScroll(event: React.UIEvent<HTMLTextAreaElement>) {
@@ -251,6 +259,58 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
       const delta = direction === 'left' ? -charWidth : charWidth;
       textAreaRef.current.scrollLeft += delta;
     }
+  }
+
+  function handleDpadMove(direction: DpadDirection) {
+    const current = cursorPosition ?? { line: 0, column: 0 };
+    let targetLine = current.line;
+    let targetColumn = current.column;
+    desiredColumnRef.current ??= current.column;
+
+    switch (direction) {
+      case 'left':
+        if (targetColumn > 0) {
+          targetColumn--;
+        } else if (targetLine > 0) {
+          targetLine--;
+          targetColumn = lines[targetLine].length;
+        }
+        desiredColumnRef.current = targetColumn;
+        break;
+      case 'right':
+        if (targetColumn < (lines[targetLine]?.length ?? 0)) {
+          targetColumn++;
+        } else if (targetLine < lines.length - 1) {
+          targetLine++;
+          targetColumn = 0;
+        }
+        desiredColumnRef.current = targetColumn;
+        break;
+      case 'up':
+        if (targetLine > 0) {
+          targetLine--;
+          targetColumn = Math.min(desiredColumnRef.current ?? 0, lines[targetLine].length);
+        }
+        break;
+      case 'down':
+        if (targetLine < lines.length - 1) {
+          targetLine++;
+          targetColumn = Math.min(desiredColumnRef.current ?? 0, lines[targetLine].length);
+        }
+        break;
+    }
+
+    if (targetLine === current.line && targetColumn === current.column) return;
+
+    let pos = 0;
+    for (let i = 0; i < targetLine; i++) pos += lines[i].length + 1;
+    pos += Math.min(targetColumn, lines[targetLine]?.length ?? 0);
+
+    if (textAreaRef.current) {
+      textAreaRef.current.setSelectionRange(pos, pos);
+      textAreaRef.current.focus();
+    }
+    setCursorPosition({ line: targetLine, column: targetColumn });
   }
 
   function handleWheel(event: React.WheelEvent<HTMLTextAreaElement>) {
@@ -289,10 +349,21 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
           ? `Line ${cursorPosition.line + 1}, Col ${cursorPosition.column + 1}`
           : 'Line —, Col —'}
       </StatusBar>
-      {isTouch &&
-        (textAreaOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
-          <Dpad onMove={handleDpadScroll} />
-        )}
+      {isTouch && options.dpad?.showCaret !== false && (
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ right: 'auto', left: '12px' }} />
+      )}
+      {isTouch && options.dpad?.showScroll !== false && (textAreaOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
+        <Dpad
+          onMove={handleDpadScroll}
+          testId="dpad-scroll"
+          enabled={{
+            up: textAreaOverflow.hasVerticalOverflow,
+            down: textAreaOverflow.hasVerticalOverflow,
+            left: textAreaOverflow.hasHorizontalOverflow,
+            right: textAreaOverflow.hasHorizontalOverflow,
+          }}
+        />
+      )}
     </>
   );
 };

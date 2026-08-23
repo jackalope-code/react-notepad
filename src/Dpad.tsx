@@ -47,9 +47,26 @@ export type DpadDirection = 'up' | 'down' | 'left' | 'right';
 
 interface DpadProps {
   onMove: (direction: DpadDirection) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  testId?: string;
+  enabled?: Partial<Record<DpadDirection, boolean>>;
 }
 
-export default function Dpad({ onMove }: DpadProps) {
+const ALL_ENABLED: Record<DpadDirection, boolean> = {
+  up: true,
+  down: true,
+  left: true,
+  right: true,
+};
+
+export default function Dpad({
+  onMove,
+  className,
+  style,
+  testId = 'dpad',
+  enabled = ALL_ENABLED,
+}: DpadProps) {
   const isPointerRef = useRef(false);
   const directionRef = useRef<DpadDirection>('up');
 
@@ -58,9 +75,18 @@ export default function Dpad({ onMove }: DpadProps) {
   });
 
   function bind(direction: DpadDirection) {
+    if (enabled[direction] === false) {
+      return {
+        'aria-hidden': 'true',
+        tabIndex: -1,
+        disabled: true,
+        style: { visibility: 'hidden' as const },
+      };
+    }
+
     return {
       'aria-label': direction,
-      'data-testid': `dpad-${direction}`,
+      'data-testid': `${testId}-${direction}`,
       onPointerDown: () => {
         isPointerRef.current = true;
         directionRef.current = direction;
@@ -85,7 +111,13 @@ export default function Dpad({ onMove }: DpadProps) {
   }
 
   return (
-    <DpadContainer role="group" aria-label="D-pad navigation" data-testid="dpad">
+    <DpadContainer
+      className={className}
+      style={style}
+      role="group"
+      aria-label="D-pad navigation"
+      data-testid={testId}
+    >
       <div />
       <DpadButton {...bind('up')}>
         <FontAwesomeIcon icon={faArrowUp} />

@@ -113,7 +113,7 @@ export function revertDelta(lines: string[], entry: HistoryEntry): string[] {
 // Parsers (handle v1 → v2 migration)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true } };
+const DEFAULT_OPTIONS: NotepadOptions = { text: { notepadWrap: true }, dpad: { showCaret: true, showScroll: true } };
 
 export function parseTextLines(raw: string): string[] {
   try {
