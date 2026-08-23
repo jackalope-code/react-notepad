@@ -77,7 +77,7 @@ export default function Dpad({
   function bind(direction: DpadDirection) {
     if (enabled[direction] === false) {
       return {
-        'aria-hidden': 'true',
+        'aria-hidden': true,
         tabIndex: -1,
         disabled: true,
         style: { visibility: 'hidden' as const },

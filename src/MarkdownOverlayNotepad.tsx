@@ -875,7 +875,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
 
   return (
     <>
-      <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} data-testid="virtual-scroll-container">
+      <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} onWheel={handleWheel} data-testid="virtual-scroll-container">
         <Sizer $height={lines.length * lineHeight} />
         <WindowRow $top={effectiveWindowStart * lineHeight} $height={windowHeight}>
           {options.text.showLineNumbers && (
