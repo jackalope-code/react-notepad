@@ -14,6 +14,14 @@ function makeDoc(id: string, title: string): StoredDocumentV3 {
 }
 
 describe('TabBar', () => {
+  beforeEach(() => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renders one tab per document with correct active state', () => {
     const docs = [makeDoc('1', 'Alpha'), makeDoc('2', 'Beta')];
     render(
@@ -81,7 +89,7 @@ describe('TabBar', () => {
     expect(screen.queryByRole('button', { name: /Close/ })).not.toBeInTheDocument();
   });
 
-  it('calls onClose without triggering onSelect when close button is clicked', () => {
+  it('calls onClose without triggering onSelect when close button is clicked and confirmed', () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const docs = [makeDoc('1', 'Alpha'), makeDoc('2', 'Beta')];
@@ -96,7 +104,28 @@ describe('TabBar', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Close Beta' }));
+    expect(window.confirm).toHaveBeenCalledWith('Close "Beta"?');
     expect(onClose).toHaveBeenCalledWith('2');
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not call onClose when close is cancelled', () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const docs = [makeDoc('1', 'Alpha'), makeDoc('2', 'Beta')];
+    render(
+      <TabBar
+        documents={docs}
+        activeDocumentId="1"
+        onSelect={onSelect}
+        onClose={onClose}
+        onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close Beta' }));
+    expect(onClose).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
   });
 

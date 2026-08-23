@@ -48,10 +48,17 @@ const DismissButton = styled.button`
 
 type UpdateSW = (reloadPage?: boolean) => Promise<void>;
 
+// How often to poll for a new service worker while the app is left open in
+// the background. The browser only checks for updates on its own when the
+// service worker registration happens (roughly on load/navigation), so a
+// long-lived SPA tab needs to trigger this itself to notice new deploys.
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
 export default function PwaReloadPrompt() {
   const [needRefresh, setNeedRefresh] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
   const updateSWRef = useRef<UpdateSW | undefined>(undefined);
+  const registrationRef = useRef<ServiceWorkerRegistration | undefined>(undefined);
 
   const handleReload = useCallback(async () => {
     await updateSWRef.current?.();
@@ -64,6 +71,19 @@ export default function PwaReloadPrompt() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Checking for an update fetches the service worker script over the
+    // network. Skip it entirely while offline so this never throws or
+    // interferes with offline use — the app keeps working from the
+    // existing cached service worker/assets regardless.
+    function checkForUpdate() {
+      if (!navigator.onLine) return;
+      registrationRef.current?.update().catch(() => {
+        // Ignore transient failures (flaky connection, captive portal,
+        // browser tab suspended, etc). We'll just try again next interval.
+      });
+    }
+
     import('virtual:pwa-register')
       .then(({ registerSW }) => {
         if (cancelled) return;
@@ -75,14 +95,26 @@ export default function PwaReloadPrompt() {
           onOfflineReady() {
             if (!cancelled) setOfflineReady(true);
           },
+          onRegisteredSW(_url, registration) {
+            registrationRef.current = registration;
+          },
         });
         updateSWRef.current = updateSW;
       })
       .catch(() => {
         // PWA registration is not available in test/non-Vite environments.
       });
+
+    const intervalId = window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS);
+    // Also check immediately whenever connectivity is restored, so a user
+    // who opened the app offline finds out about an update as soon as
+    // they're back online rather than waiting for the next interval tick.
+    window.addEventListener('online', checkForUpdate);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('online', checkForUpdate);
     };
   }, []);
 

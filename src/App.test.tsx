@@ -143,6 +143,7 @@ describe('App', () => {
   });
 
   it('closing a tab removes it and cannot remove the last remaining tab', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await renderApp();
     fireEvent.click(screen.getByRole('button', { name: 'New document' }));
     const titleField = await screen.findByLabelText('Title');

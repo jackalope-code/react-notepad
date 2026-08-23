@@ -8,7 +8,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' leaves control of when to activate a new service worker
+      // (and thus when the page reloads onto new assets) to the user via
+      // PwaReloadPrompt's Reload button. 'autoUpdate' would activate and
+      // reload in the background without asking, which conflicts with
+      // that UI.
+      registerType: 'prompt',
       devOptions: {
         enabled: true
       }

@@ -15,7 +15,16 @@ const pwaStubPlugin = {
   },
   load(id: string) {
     if (id === '\0virtual:pwa-register') {
-      return `export function registerSW() { return () => Promise.resolve(); }`;
+      // Exposes the options passed to registerSW (and a fake registration
+      // object) on globalThis so tests can drive onNeedRefresh/onOfflineReady
+      // and assert on registration.update() calls, without a real SW.
+      return `export function registerSW(opts) {
+        globalThis.__pwaRegisterSWOpts = opts;
+        if (opts && opts.onRegisteredSW) {
+          opts.onRegisteredSW('sw.js', globalThis.__mockRegistration);
+        }
+        return () => Promise.resolve();
+      }`;
     }
   },
 };

@@ -146,7 +146,10 @@ function TabBar({ documents, activeDocumentId, onSelect, onClose, onAddClick, on
                 aria-label={`Close ${doc.title || 'Untitled'}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onClose(doc.id);
+                  const title = doc.title || 'Untitled';
+                  if (window.confirm(`Close "${title}"?`)) {
+                    onClose(doc.id);
+                  }
                 }}
               >
                 &times;
