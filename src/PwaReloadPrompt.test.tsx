@@ -76,6 +76,29 @@ describe('PwaReloadPrompt', () => {
     expect(updateMock).toHaveBeenCalledTimes(1);
   });
 
+  it('checks for an update when the document becomes visible', async () => {
+    render(<PwaReloadPrompt />);
+    await flushMicrotasks();
+    expect(updateMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(updateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks for an update when the window regains focus while visible', async () => {
+    render(<PwaReloadPrompt />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      window.dispatchEvent(new Event('focus'));
+    });
+    expect(updateMock).toHaveBeenCalledTimes(1);
+  });
+
   it('shows a reload prompt when an update is available and reloads via updateSW on click', async () => {
     render(<PwaReloadPrompt />);
     await flushMicrotasks();

@@ -9,15 +9,17 @@ const DpadContainer = styled.div`
   bottom: 32px;
   right: 12px;
   display: grid;
-  grid-template-columns: 40px 40px 40px;
-  grid-template-rows: 40px 40px 40px;
-  gap: 4px;
+  grid-template-columns: 56px 56px 56px;
+  grid-template-rows: 56px 56px 56px;
+  gap: 6px;
   z-index: 20;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #cbd5e1;
+  /* Transparent/borderless so the panel itself never obscures the
+     document underneath it — only the individual buttons are visible. */
+  background: transparent;
+  border: none;
   border-radius: 12px;
-  padding: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 0;
+  box-shadow: none;
 `;
 
 const DpadButton = styled.button`
@@ -27,11 +29,12 @@ const DpadButton = styled.button`
   width: 100%;
   height: 100%;
   border: 1px solid #94a3b8;
-  border-radius: 8px;
-  background: #f8fafc;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.9);
   color: #334155;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 1.3rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   touch-action: manipulation;
 
   &:hover {

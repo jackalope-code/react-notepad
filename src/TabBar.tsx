@@ -27,6 +27,7 @@ const TabList = styled.div`
   display: flex;
   align-items: center;
   flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;

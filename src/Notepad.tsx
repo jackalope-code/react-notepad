@@ -29,7 +29,7 @@ const StyledTextArea = styled.textarea.withConfig({
   shouldForwardProp: (prop) => prop !== 'notepadWrap',
 })<TextAreaProps>`
     width: 100%;
-    height: 100dvh;
+    height: 100%;
     overflow-y: scroll;
     overflow-x: ${(props) => (props.notepadWrap ? 'hidden' : 'scroll')};
     resize: none;
@@ -183,14 +183,15 @@ const EditorRow = styled.div`
   display: flex;
   align-items: stretch;
   width: 100%;
-  height: 100dvh;
+  flex: 1 1 auto;
+  min-height: 0;
 `;
 
 const LineNumberGutter = styled.div`
   flex: 0 0 auto;
   padding: 0 8px;
   overflow-y: hidden;
-  height: 100dvh;
+  height: 100%;
   text-align: right;
   color: gray;
   background-color: #f5f5f5;
@@ -314,7 +315,9 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
   }
 
   function handleWheel(event: React.WheelEvent<HTMLTextAreaElement>) {
-    if (event.ctrlKey || event.metaKey) {
+    // Shift+scroll (not Ctrl+scroll) is used for horizontal scroll here
+    // because Ctrl+scroll is already reserved by the browser for page zoom.
+    if (event.shiftKey) {
       event.preventDefault();
       if (!textAreaRef.current) return;
       textAreaRef.current.scrollLeft += event.deltaY;
@@ -350,7 +353,7 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
           : 'Line —, Col —'}
       </StatusBar>
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ right: 'auto', left: '12px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '228px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (textAreaOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad

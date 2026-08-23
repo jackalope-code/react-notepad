@@ -28,9 +28,24 @@ const TitleInput = styled.input`
 `;
 
 const Main = styled.div`
+  display: flex;
+  flex-direction: column;
   height: 100dvh;
   max-width: 100vw;
   overflow: hidden;
+`;
+
+// Wraps whichever editor variant is active so it can be given `flex: 1;
+// min-height: 0;` here, in one place, regardless of which editor's own
+// styled container claims a fixed `height: 100dvh` internally. Without
+// `min-height: 0` a flex item won't shrink below its content's natural
+// height, so the editor would still overflow `Main` instead of being
+// confined to the space left after the NavBar/TabBar/toolbar/title above it.
+const EditorSlot = styled.div`
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 `;
 
 function downloadTextFile(filename: string, content: string) {
@@ -152,28 +167,30 @@ function MainView({ workspace }: MainViewProps) {
           </button>
         </div>
         <TitleInput className="title" type="text" onChange={(e) => setTitle(activeDocument!.id, e.currentTarget.value)} value={activeDocument.title} />
-        {activeDocument.markdownEnabled ? (
-          <MarkdownOverlayNotepad
-            key={activeDocument.id}
-            lines={activeDocument.lines}
-            setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
-            options={activeDocument.options}
-          />
-        ) : USE_VIRTUALIZED_EDITOR ? (
-          <VirtualizedNotepad
-            key={activeDocument.id}
-            lines={activeDocument.lines}
-            setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
-            options={activeDocument.options}
-          />
-        ) : (
-          <Notepad
-            key={activeDocument.id}
-            lines={activeDocument.lines}
-            setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
-            options={activeDocument.options}
-          />
-        )}
+        <EditorSlot>
+          {activeDocument.markdownEnabled ? (
+            <MarkdownOverlayNotepad
+              key={activeDocument.id}
+              lines={activeDocument.lines}
+              setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
+              options={activeDocument.options}
+            />
+          ) : USE_VIRTUALIZED_EDITOR ? (
+            <VirtualizedNotepad
+              key={activeDocument.id}
+              lines={activeDocument.lines}
+              setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
+              options={activeDocument.options}
+            />
+          ) : (
+            <Notepad
+              key={activeDocument.id}
+              lines={activeDocument.lines}
+              setLines={(lines, cursorLine) => setLines(activeDocument!.id, lines, cursorLine)}
+              options={activeDocument.options}
+            />
+          )}
+        </EditorSlot>
       </Main>
       <Footer />
       <NewDocumentDialog

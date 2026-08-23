@@ -52,14 +52,14 @@ import { useMeasuredCharWidth } from './useMeasuredCharWidth';
 const VirtualScrollContainer = styled.div`
   position: relative;
   width: 100%;
-  height: 100dvh;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 `;
 
 const Sizer = styled.div<{ $height: number }>`
   height: ${(p) => p.$height}px;
-  min-height: 100dvh;
+  min-height: 100%;
 `;
 
 const WindowRow = styled.div<{ $top: number; $height: number }>`
@@ -68,7 +68,7 @@ const WindowRow = styled.div<{ $top: number; $height: number }>`
   left: 0;
   width: 100%;
   height: ${(p) => p.$height}px;
-  min-height: 100dvh;
+  min-height: 100%;
   display: flex;
   align-items: stretch;
 `;
@@ -704,7 +704,8 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
 
   // D-pad and wheel helpers for the overlay editor. The d-pad scrolls the
   // virtualized container vertically and the textarea/overlay horizontally.
-  // Ctrl+wheel is remapped to horizontal scroll on the textarea.
+  // Shift+wheel is remapped to horizontal scroll on the textarea (not
+  // Ctrl+wheel, which the browser already reserves for page zoom).
   function handleDpadScroll(direction: DpadDirection) {
     if (direction === 'up' || direction === 'down') {
       if (!scrollContainerRef.current) return;
@@ -721,7 +722,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   }
 
   function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (event.ctrlKey || event.metaKey) {
+    if (event.shiftKey) {
       event.preventDefault();
       if (!textAreaRef.current) return;
       textAreaRef.current.scrollLeft += event.deltaY;
@@ -936,7 +937,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
         onCancelPlacement={() => setPendingInsertLines(null)}
       />
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ right: 'auto', left: '12px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '228px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad

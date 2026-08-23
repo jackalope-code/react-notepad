@@ -111,10 +111,23 @@ export default function PwaReloadPrompt() {
     // they're back online rather than waiting for the next interval tick.
     window.addEventListener('online', checkForUpdate);
 
+    // On mobile, the app is frequently paused/restored instead of reloaded.
+    // Check when the user returns to it (tab becomes visible or window gets
+    // focus) so the prompt can appear quickly after a new build is deployed.
+    function handleVisibilityOrFocus() {
+      if (document.visibilityState === 'visible') {
+        checkForUpdate();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       window.removeEventListener('online', checkForUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
   }, []);
 

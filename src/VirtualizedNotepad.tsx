@@ -67,14 +67,14 @@ function useMeasuredLineHeight(): number {
 const VirtualScrollContainer = styled.div`
   position: relative;
   width: 100%;
-  height: 100dvh;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 `;
 
 const Sizer = styled.div<{ $height: number }>`
   height: ${(p) => p.$height}px;
-  min-height: 100dvh;
+  min-height: 100%;
 `;
 
 const WindowRow = styled.div<{ $top: number }>`
@@ -106,7 +106,7 @@ const OverlayTextArea = styled.textarea.withConfig({
 })<OverlayTextAreaProps>`
   flex: 1 1 auto;
   height: ${(p) => p.$height}px;
-  min-height: 100dvh;
+  min-height: 100%;
   border: none;
   resize: none;
   overflow-y: hidden;
@@ -301,7 +301,9 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
   }
 
   function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (event.ctrlKey || event.metaKey) {
+    // Shift+scroll (not Ctrl+scroll) is used for horizontal scroll here
+    // because Ctrl+scroll is already reserved by the browser for page zoom.
+    if (event.shiftKey) {
       event.preventDefault();
       if (!textAreaRef.current) return;
       textAreaRef.current.scrollLeft += event.deltaY;
@@ -337,7 +339,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
         </WindowRow>
       </VirtualScrollContainer>
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ right: 'auto', left: '12px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '228px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad
