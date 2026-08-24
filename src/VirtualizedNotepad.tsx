@@ -345,7 +345,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
         </WindowRow>
       </VirtualScrollContainer>
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '202px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: 'auto', top: '180px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (containerOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad

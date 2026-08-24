@@ -356,7 +356,7 @@ const Notepad = ({ lines, setLines, options }: NotepadProps) => {
           : 'Line —, Col —'}
       </StatusBar>
       {isTouch && options.dpad?.showCaret !== false && (
-        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: '202px' }} />
+        <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: 'auto', top: '180px' }} />
       )}
       {isTouch && options.dpad?.showScroll !== false && (textAreaOverflow.hasVerticalOverflow || textAreaOverflow.hasHorizontalOverflow) && (
         <Dpad

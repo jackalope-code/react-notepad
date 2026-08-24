@@ -9,7 +9,7 @@ const DPAD_BUTTON_SIZE = 48;
 
 const DpadContainer = styled.div`
   position: fixed;
-  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  bottom: max(240px, 35vh, env(safe-area-inset-bottom, 0px));
   right: max(8px, env(safe-area-inset-right, 0px));
   display: grid;
   grid-template-columns: ${DPAD_BUTTON_SIZE}px ${DPAD_BUTTON_SIZE}px ${DPAD_BUTTON_SIZE}px;
