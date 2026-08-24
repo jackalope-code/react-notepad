@@ -79,12 +79,14 @@ const Sizer = styled.div<{ $height: number }>`
   min-height: 100%;
 `;
 
-const WindowRow = styled.div<{ $top: number }>`
+const WindowRow = styled.div<{ $top: number; $height: number }>`
   position: absolute;
   top: ${(p) => p.$top}px;
-  min-width: 0;
   left: 0;
   width: 100%;
+  min-width: 0;
+  height: ${(p) => p.$height}px;
+  min-height: 100%;
   display: flex;
   align-items: stretch;
 `;
@@ -320,7 +322,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
     <>
       <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} onWheel={handleWheel} data-testid="virtual-scroll-container">
         <Sizer $height={lines.length * lineHeight} />
-        <WindowRow $top={effectiveWindowStart * lineHeight}>
+        <WindowRow $top={effectiveWindowStart * lineHeight} $height={windowHeight}>
           {options.text.showLineNumbers && (
             <LineNumberGutter $height={windowHeight} aria-hidden="true" data-testid="line-number-gutter">
               {windowLines.map((_, i) => `${effectiveWindowStart + i + 1}\n`)}

@@ -6,6 +6,14 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* On touch devices, allow panning but disable pinch zoom as a fallback in
+   case the dynamic viewport meta tag is ignored. */
+@media (any-pointer: coarse) {
+  html, body, #root {
+    touch-action: pan-x pan-y;
+  }
+}
+
 #root {
   display: flex;
   flex-direction: column;

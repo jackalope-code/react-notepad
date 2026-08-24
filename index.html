@@ -3,8 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>react-notepad</title>
+    <script>
+      // Disable pinch zoom only on touch devices (mobile/tablets). On PC,
+      // leave user-scalable enabled so mouse/keyboard zoom still works.
+      (function () {
+        const isTouch =
+          window.matchMedia('(any-pointer: coarse)').matches ||
+          (navigator.maxTouchPoints !== undefined && navigator.maxTouchPoints > 0);
+        const content = isTouch
+          ? 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
+          : 'width=device-width, initial-scale=1.0, viewport-fit=cover';
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = content;
+        document.head.appendChild(meta);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
