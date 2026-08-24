@@ -20,10 +20,10 @@ const TitleInput = styled.input`
   border: none;
   display: inline;
   font-family: inherit;
-  font-size: inherit;
-  padding: none;
+  padding: 0;
   width: auto;
   font-size: 1.5rem;
+  font-size: max(1.5rem, 16px);
   font-weight: 600;
 `;
 
