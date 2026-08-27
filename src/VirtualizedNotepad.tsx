@@ -220,6 +220,7 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
         index += Math.min(column, targetWindowLines[line - effectiveWindowStart]?.length ?? 0);
         textAreaRef.current.selectionStart = index;
         textAreaRef.current.selectionEnd = index;
+        textAreaRef.current.focus();
         setCursorPosition({ line, column });
         pendingDpadTargetRef.current = null;
       }
@@ -293,10 +294,23 @@ const VirtualizedNotepad = ({ lines, setLines, options }: VirtualizedNotepadProp
 
     if (targetLine === current.line && targetColumn === current.column) return;
 
-    pendingDpadTargetRef.current = { line: targetLine, column: targetColumn };
-
     const isInWindow = targetLine >= effectiveWindowStart && targetLine < windowEnd;
-    if (!isInWindow) {
+
+    if (isInWindow) {
+      const targetWindowLines = lines.slice(effectiveWindowStart, windowEnd);
+      let index = 0;
+      for (let i = 0; i < targetLine - effectiveWindowStart; i++) {
+        index += targetWindowLines[i].length + 1;
+      }
+      index += Math.min(targetColumn, targetWindowLines[targetLine - effectiveWindowStart]?.length ?? 0);
+      if (textAreaRef.current) {
+        textAreaRef.current.selectionStart = index;
+        textAreaRef.current.selectionEnd = index;
+        textAreaRef.current.focus();
+      }
+      setCursorPosition({ line: targetLine, column: targetColumn });
+    } else {
+      pendingDpadTargetRef.current = { line: targetLine, column: targetColumn };
       const maxStart = Math.max(0, lines.length - WINDOW_LINES);
       const newStart = Math.max(0, Math.min(targetLine - OVERSCAN_LINES, maxStart));
       setWindowStart(newStart);

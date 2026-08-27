@@ -614,6 +614,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
         index += Math.min(column, targetLineText.length);
         textAreaRef.current.selectionStart = index;
         textAreaRef.current.selectionEnd = index;
+        textAreaRef.current.focus();
         setCursorPosition({ line, column });
         pendingDpadTargetRef.current = null;
       }
@@ -693,6 +694,7 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
       if (textAreaRef.current) {
         textAreaRef.current.selectionStart = index;
         textAreaRef.current.selectionEnd = index;
+        textAreaRef.current.focus();
       }
       setCursorPosition({ line: targetLine, column: targetColumn });
     } else {
