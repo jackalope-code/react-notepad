@@ -183,8 +183,11 @@ test.describe('Tab overflow arrows (mobile / touch)', () => {
 
     const rightArrow = page.getByTestId('tab-scroll-right');
     await expect(rightArrow).toBeVisible();
+    const leftArrow = page.getByTestId('tab-scroll-left');
+    await expect(leftArrow).toBeVisible();
 
     const tabList = page.getByTestId('tab-list');
+    await leftArrow.click();
     const before = await tabList.evaluate((el) => el.scrollLeft);
 
     await rightArrow.click();
