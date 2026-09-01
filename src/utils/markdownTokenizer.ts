@@ -175,7 +175,10 @@ function walkInlineTokens(
 // Block token walking
 // ---------------------------------------------------------------------------
 
-const LIST_MARKER_RE = /^(\s*)([-*+]|\d+[.)])(\s+)/;
+// Exported so callers outside this module (e.g. the "+" menu's Bulleted
+// List action in MarkdownOverlayNotepad) can detect whether a line is
+// already a list item before deciding to prefix it with a new marker.
+export const LIST_MARKER_RE = /^(\s*)([-*+]|\d+[.)])(\s+)/;
 const BLOCKQUOTE_MARKER_RE = /^ {0,3}>\s?/;
 
 /** Marks each line's leading blockquote `>` (and following optional space)
@@ -280,6 +283,31 @@ function walkListToken(token: Tokens.List, text: string, start: number, end: num
         itemStart + markerMatch[0].length,
         token.ordered ? 'md-list-marker-ordered' : 'md-list-marker-bullet',
       );
+    }
+
+    // GFM task list item (`- [ ] text` / `- [x] text`): marked emits a
+    // dedicated `checkbox` sub-token immediately after the list marker.
+    // Tag its raw "[ ] "/"[x] " span with a class distinct from the plain
+    // list marker so it has intentional fallback styling even if the
+    // interactive checkbox overlay (see findTaskCheckboxes, rendered in
+    // MarkdownOverlayNotepad) fails to position over it for any reason.
+    if (item.task) {
+      const checkboxToken = (item.tokens ?? []).find((t) => t.type === 'checkbox') as
+        | (Token & { raw: string; checked?: boolean })
+        | undefined;
+      if (checkboxToken) {
+        const checkboxOffset = findContentOffset(item.raw, checkboxToken.raw);
+        if (checkboxOffset !== null) {
+          const checkboxStart = itemStart + checkboxOffset;
+          const checkboxEnd = checkboxStart + checkboxToken.raw.length;
+          addClass(
+            classes,
+            checkboxStart,
+            checkboxEnd,
+            checkboxToken.checked ? 'md-checkbox-marker md-checkbox-checked' : 'md-checkbox-marker md-checkbox-unchecked',
+          );
+        }
+      }
     }
 
     const contentOffset = findContentOffset(item.raw, item.text);
@@ -405,6 +433,91 @@ export function findChartFences(text: string): ChartFence[] {
             source: codeToken.text,
           });
         }
+      }
+      cursor += token.raw.length;
+    }
+  } catch (err) {
+    logError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
+    return [];
+  }
+  return result;
+}
+
+export interface TaskCheckbox {
+  /** 0-based source line the checkbox appears on. */
+  line: number;
+  /** 0-based column (within that line) where the "[" of the checkbox starts. */
+  column: number;
+  /** Length of the raw checkbox token, e.g. "[ ] " or "[x] " (usually 4). */
+  length: number;
+  checked: boolean;
+}
+
+/** Converts an absolute character offset in `text` into a {line, column}
+ * pair (both 0-based), matching `text.split('\n')` line indexing. */
+function offsetToLineColumn(text: string, offset: number): { line: number; column: number } {
+  const before = text.slice(0, offset);
+  const lastNewline = before.lastIndexOf('\n');
+  const line = before.split('\n').length - 1;
+  const column = lastNewline === -1 ? offset : offset - lastNewline - 1;
+  return { line, column };
+}
+
+/** Recursively walks a list token's items (and any nested lists within
+ * them) collecting task-list checkbox positions. */
+function collectCheckboxesFromList(
+  token: Tokens.List,
+  text: string,
+  start: number,
+  end: number,
+  result: TaskCheckbox[],
+): void {
+  let searchCursor = start;
+  for (const item of token.items) {
+    const itemStart = text.indexOf(item.raw, searchCursor);
+    if (itemStart === -1 || itemStart >= end) continue;
+    const itemEnd = itemStart + item.raw.length;
+
+    if (item.task) {
+      const checkboxToken = (item.tokens ?? []).find((t) => t.type === 'checkbox') as
+        | (Token & { raw: string; checked?: boolean })
+        | undefined;
+      if (checkboxToken) {
+        const checkboxOffset = findContentOffset(item.raw, checkboxToken.raw);
+        if (checkboxOffset !== null) {
+          const absoluteOffset = itemStart + checkboxOffset;
+          const { line, column } = offsetToLineColumn(text, absoluteOffset);
+          result.push({ line, column, length: checkboxToken.raw.length, checked: Boolean(checkboxToken.checked) });
+        }
+      }
+    }
+
+    // A list item's content can itself contain a nested list — recurse so
+    // multi-level task lists get all their checkboxes found too.
+    for (const nested of item.tokens ?? []) {
+      if (nested.type === 'list') {
+        collectCheckboxesFromList(nested as Tokens.List, text, itemStart, itemEnd, result);
+      }
+    }
+
+    searchCursor = itemEnd;
+  }
+}
+
+/**
+ * Finds every GFM task-list checkbox (`- [ ] ...` / `- [x] ...`) in `text`,
+ * returning its line/column position and checked state so the overlay can
+ * render a clickable checkbox control on top of it (see
+ * `CheckboxOverlayLayer` in `MarkdownOverlayNotepad.tsx`).
+ */
+export function findTaskCheckboxes(text: string): TaskCheckbox[] {
+  const result: TaskCheckbox[] = [];
+  try {
+    const tokens = marked.lexer(text);
+    let cursor = 0;
+    for (const token of tokens) {
+      if (token.type === 'list') {
+        collectCheckboxesFromList(token as Tokens.List, text, cursor, cursor + token.raw.length, result);
       }
       cursor += token.raw.length;
     }

@@ -410,4 +410,109 @@ describe('MarkdownOverlayNotepad', () => {
       expect(nextLines).toEqual(['```mermaid', 'graph TD;', '  X --> Y;', '```']);
     });
   });
+
+  describe('task-list checkboxes', () => {
+    it('renders a clickable checkbox control for a task-list item', () => {
+      render(<MarkdownOverlayNotepad lines={['- [ ] todo one']} setLines={vi.fn()} options={defaultOptions} />);
+      expect(screen.getByTestId('task-checkbox')).toBeInTheDocument();
+    });
+
+    it('clicking an unchecked checkbox commits "[x] " in place via setLines', () => {
+      const setLines = vi.fn();
+      render(<MarkdownOverlayNotepad lines={['- [ ] todo one']} setLines={setLines} options={defaultOptions} />);
+      fireEvent.click(screen.getByTestId('task-checkbox'));
+      expect(setLines).toHaveBeenCalledWith(['- [x] todo one'], 0);
+    });
+
+    it('clicking a checked checkbox commits "[ ] " in place via setLines', () => {
+      const setLines = vi.fn();
+      render(<MarkdownOverlayNotepad lines={['- [x] done one']} setLines={setLines} options={defaultOptions} />);
+      fireEvent.click(screen.getByTestId('task-checkbox'));
+      expect(setLines).toHaveBeenCalledWith(['- [ ] done one'], 0);
+    });
+
+    it('renders one checkbox control per task-list item, in document order', () => {
+      const lines = ['- [ ] todo one', '- [x] done one', 'not a task'];
+      const setLines = vi.fn();
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+      const checkboxes = screen.getAllByTestId('task-checkbox');
+      expect(checkboxes).toHaveLength(2);
+
+      fireEvent.click(checkboxes[1]);
+      expect(setLines).toHaveBeenCalledWith(['- [ ] todo one', '- [ ] done one', 'not a task'], 1);
+    });
+  });
+
+  describe('InsertToolbar — Bulleted List', () => {
+    function openToolbar() {
+      fireEvent.click(screen.getByRole('button', { name: 'Insert options' }));
+    }
+
+    it('prefixes the current line with "- " when nothing is selected', () => {
+      const setLines = vi.fn();
+      const lines = ['hello world'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+      const textarea = screen.getByTestId('markdown-overlay-textarea') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'selectionStart', { value: 3, configurable: true });
+      Object.defineProperty(textarea, 'selectionEnd', { value: 3, configurable: true });
+
+      openToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Bulleted list' }));
+
+      expect(setLines).toHaveBeenCalledWith(['- hello world'], 0);
+    });
+
+    it('prefixes every line the selection touches, skipping lines already in a list', () => {
+      const setLines = vi.fn();
+      const lines = ['first', 'second', '- already a list item', 'fourth'];
+      const text = lines.join('\n');
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+      const textarea = screen.getByTestId('markdown-overlay-textarea') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'selectionStart', { value: text.indexOf('first'), configurable: true });
+      Object.defineProperty(textarea, 'selectionEnd', { value: text.indexOf('- already') + 5, configurable: true });
+
+      openToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Bulleted list' }));
+
+      expect(setLines).toHaveBeenCalledWith(
+        ['- first', '- second', '- already a list item', 'fourth'],
+        0,
+      );
+    });
+  });
+
+  describe('InsertToolbar — Strikethrough', () => {
+    function openToolbar() {
+      fireEvent.click(screen.getByRole('button', { name: 'Insert options' }));
+    }
+
+    it('wraps the current selection in ~~ ~~', () => {
+      const setLines = vi.fn();
+      const lines = ['hello world'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+      const textarea = screen.getByTestId('markdown-overlay-textarea') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'selectionStart', { value: 0, configurable: true });
+      Object.defineProperty(textarea, 'selectionEnd', { value: 5, configurable: true });
+
+      openToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Strikethrough' }));
+
+      expect(setLines).toHaveBeenCalledWith(['~~hello~~ world'], 0);
+    });
+
+    it('shows a hint and makes no edit when nothing is selected', () => {
+      const setLines = vi.fn();
+      const lines = ['hello world'];
+      render(<MarkdownOverlayNotepad lines={lines} setLines={setLines} options={defaultOptions} />);
+      const textarea = screen.getByTestId('markdown-overlay-textarea') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'selectionStart', { value: 3, configurable: true });
+      Object.defineProperty(textarea, 'selectionEnd', { value: 3, configurable: true });
+
+      openToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Strikethrough' }));
+
+      expect(setLines).not.toHaveBeenCalled();
+      expect(screen.getByText('Select some text first to strike it through')).toBeInTheDocument();
+    });
+  });
 });

@@ -41,12 +41,40 @@ const TabList = styled.div`
   }
 `;
 
+// Device-independent (rem-based, so it scales with root font-size/zoom
+// rather than being pinned to a raw device pixel value) sizing for the
+// per-tab action buttons and the tab's overall minimum width.
+//
+// The minimum *tappable label space* (the part of a tab a user can tap to
+// switch to it, excluding the settings/close buttons) is defined as 1.5x
+// the settings button's width plus 1.5x the close button's width — enough
+// room for a fingertip press that reliably lands on the label rather than
+// clipping one of the buttons. The tab's overall min-width then adds the
+// buttons themselves plus the existing paddings/gaps on top of that.
+//
+// Sized for the worst case (both settings AND close buttons present) even
+// though settings only renders on the active tab and close only when
+// there's more than one document — this keeps every tab's width stable
+// when a tab becomes/stops being active or a document is closed, instead
+// of tabs jumping in size.
+const BUTTON_SIZE_REM = 1.125; // 18px at the default 16px root font-size.
+const TAB_PADDING_X_REM = 0.75; // matches Tab's `padding: 8px 12px`.
+const TAB_GAP_REM = 0.375; // matches Tab's `gap: 6px`.
+const MIN_LABEL_WIDTH_REM = 1.5 * BUTTON_SIZE_REM + 1.5 * BUTTON_SIZE_REM;
+const TAB_MIN_WIDTH_REM =
+  2 * TAB_PADDING_X_REM + // left + right padding
+  MIN_LABEL_WIDTH_REM + // minimum tappable label space
+  2 * TAB_GAP_REM + // label-settings gap + settings-close gap
+  2 * BUTTON_SIZE_REM; // settings button + close button
+
 const Tab = styled.div<{ $active: boolean }>`
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: ${TAB_GAP_REM}rem;
+  padding: 8px ${TAB_PADDING_X_REM}rem;
+  min-width: ${TAB_MIN_WIDTH_REM}rem;
+  box-sizing: border-box;
   cursor: pointer;
   border-right: 1px solid lightslategray;
   background-color: ${(props) => (props.$active ? 'white' : 'transparent')};
@@ -58,8 +86,9 @@ const CloseButton = styled.button`
   border: none;
   background: none;
   border-radius: 50%;
-  width: 18px;
-  height: 18px;
+  width: ${BUTTON_SIZE_REM}rem;
+  height: ${BUTTON_SIZE_REM}rem;
+  flex: 0 0 auto;
   line-height: 1;
   padding: 0;
   margin: 0;
@@ -70,8 +99,9 @@ const SettingsButton = styled.button`
   border: none;
   background: none;
   border-radius: 50%;
-  width: 18px;
-  height: 18px;
+  width: ${BUTTON_SIZE_REM}rem;
+  height: ${BUTTON_SIZE_REM}rem;
+  flex: 0 0 auto;
   line-height: 1;
   padding: 0;
   margin: 0;

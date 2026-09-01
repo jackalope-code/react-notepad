@@ -1,12 +1,12 @@
 import styled from 'styled-components';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, TextField, IconButton } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, TextField, IconButton, Snackbar } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faSquare, faSquareCheck } from '@fortawesome/free-solid-svg-icons';
 import mermaid from 'mermaid';
 import { getCursorPosition, type NotepadOptions } from './Notepad';
 import { WINDOW_LINES, OVERSCAN_LINES } from './VirtualizedNotepad';
-import { computeLineSegments, findChartFences, type ChartFence } from './utils/markdownTokenizer';
+import { computeLineSegments, findChartFences, findTaskCheckboxes, LIST_MARKER_RE, type ChartFence } from './utils/markdownTokenizer';
 import InsertToolbar from './InsertToolbar';
 import Dpad, { type DpadDirection } from './Dpad';
 import { useIsTouchDevice } from './useIsTouchDevice';
@@ -225,6 +225,16 @@ const HighlightOverlay = styled.div.withConfig({
   .md-chart-block {
     background-color: #eef2ff;
   }
+  /* Fallback styling for a GFM task-list checkbox's raw "[ ] "/"[x] " text,
+   * used only if the interactive CheckboxOverlayLayer control (rendered on
+   * top of the textarea, see below) fails to position over it for any
+   * reason — never hidden, so the raw syntax is always readable/editable. */
+  .md-checkbox-marker {
+    color: #94a3b8;
+  }
+  .md-checkbox-checked {
+    color: #16a34a;
+  }
 `;
 
 const LineNumberGutter = styled.div`
@@ -309,6 +319,41 @@ const ChartOverlayLayer = styled.div`
   position: absolute;
   inset: 0;
   pointer-events: none;
+`;
+
+// Same rationale as ChartOverlayLayer above (rendered after
+// TransparentTextArea so its children can actually receive clicks), but for
+// task-list checkboxes: a small pointer-events: auto hit target positioned
+// exactly over each raw "[ ] "/"[x] " span, sized generously (24px) for a
+// comfortable tap target even though the glyph itself is smaller. Its
+// opaque background masks the raw bracket text underneath it, similar to
+// how ChartThumbnailContainer masks a fence's raw text.
+const CheckboxOverlayLayer = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+`;
+
+const CHECKBOX_HIT_SIZE = 24;
+
+const CheckboxHitTarget = styled.button`
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: ${CHECKBOX_HIT_SIZE}px;
+  height: ${CHECKBOX_HIT_SIZE}px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background-color: #ffffff;
+  pointer-events: auto;
+  cursor: pointer;
+  color: #94a3b8;
+
+  &.checked {
+    color: #16a34a;
+  }
 `;
 
 const ChartErrorBadge = styled.div`
@@ -544,6 +589,10 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   // or chart type from InsertToolbar — the next click/tap in the document
   // inserts these lines at that position instead of moving the cursor.
   const [pendingInsertLines, setPendingInsertLines] = useState<string[] | null>(null);
+  // Briefly shown when Strikethrough is tapped with no text selected —
+  // unlike table/chart/bulleted-list, there's nothing sensible to apply it
+  // to, so we just hint that a selection is required rather than editing.
+  const [strikethroughHintOpen, setStrikethroughHintOpen] = useState(false);
   // The chart fence currently open in the floating editor popover, or null.
   const [chartPopoverFence, setChartPopoverFence] = useState<ChartFence | null>(null);
 
@@ -558,6 +607,26 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
   // Top-level mermaid fences, by line range, so their raw text can be
   // replaced with a fixed-size ChartThumbnail (see ChartThumbnail above).
   const chartFences = useMemo(() => findChartFences(lines.join('\n')), [lines]);
+  // GFM task-list checkboxes ("- [ ] "/"- [x] "), by line/column, so a
+  // clickable CheckboxHitTarget can be positioned over each one (see
+  // CheckboxOverlayLayer above).
+  const taskCheckboxes = useMemo(() => findTaskCheckboxes(lines.join('\n')), [lines]);
+
+  // Toggles a single task-list checkbox's checked state in place (" " <-> "x"
+  // at the recovered column) and commits the change via setLines, keeping
+  // the cursor on that line.
+  function handleToggleCheckbox(checkbox: { line: number; column: number; checked: boolean }) {
+    const targetLine = lines[checkbox.line];
+    if (targetLine === undefined) return;
+    const replacement = checkbox.checked ? ' ' : 'x';
+    // The checkbox's raw span is "[ ] "/"[x] " — the checked-state
+    // character always sits one position after the opening "[".
+    const charIndex = checkbox.column + 1;
+    if (targetLine[charIndex] === undefined) return;
+    const nextLine = targetLine.slice(0, charIndex) + replacement + targetLine.slice(charIndex + 1);
+    const nextLines = [...lines.slice(0, checkbox.line), nextLine, ...lines.slice(checkbox.line + 1)];
+    setLines(nextLines, checkbox.line);
+  }
 
   function handleScroll(event: React.UIEvent<HTMLDivElement>) {
     const scrollTop = event.currentTarget.scrollTop;
@@ -759,6 +828,61 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
     handleCursorMove(event);
   }
 
+  /** Converts a 0-based {line, column} (line indexing the full `lines`
+   * array) into an absolute character offset into `lines.join('\n')`. */
+  function lineColumnToOffset(line: number, column: number): number {
+    let offset = 0;
+    for (let i = 0; i < line; i++) offset += lines[i].length + 1; // +1 for '\n'
+    return offset + column;
+  }
+
+  /** Maps a selectionStart/selectionEnd position within the *windowed*
+   * textarea value (`windowLines.join('\n')`) to an absolute {line, column}
+   * in the full document. */
+  function windowPosToLineColumn(pos: number): { line: number; column: number } {
+    const positionInWindow = getCursorPosition(windowLines, pos);
+    return { line: effectiveWindowStart + positionInWindow.line, column: positionInWindow.column };
+  }
+
+  // "+" menu: converts the current line (or, if there's a selection, every
+  // line the selection touches) into a bulleted list item by prefixing
+  // "- ", skipping any line that's already a list item.
+  function handleBulletList() {
+    const ta = textAreaRef.current;
+    if (!ta) return;
+    const startPos = windowPosToLineColumn(ta.selectionStart);
+    const endPos = windowPosToLineColumn(ta.selectionEnd);
+    const firstLine = Math.min(startPos.line, endPos.line);
+    const lastLine = Math.max(startPos.line, endPos.line);
+
+    const nextLines = lines.map((line, i) => {
+      if (i < firstLine || i > lastLine) return line;
+      if (LIST_MARKER_RE.test(line)) return line;
+      return `- ${line}`;
+    });
+    setLines(nextLines, firstLine);
+  }
+
+  // "+" menu: wraps the current text selection in ~~ ~~. If nothing is
+  // selected, there's no sensible target to apply it to — show a brief
+  // hint instead of editing the document.
+  function handleStrikethrough() {
+    const ta = textAreaRef.current;
+    if (!ta) return;
+    if (ta.selectionStart === ta.selectionEnd) {
+      setStrikethroughHintOpen(true);
+      return;
+    }
+    const startPos = windowPosToLineColumn(ta.selectionStart);
+    const endPos = windowPosToLineColumn(ta.selectionEnd);
+    const absStart = lineColumnToOffset(startPos.line, startPos.column);
+    const absEnd = lineColumnToOffset(endPos.line, endPos.column);
+    const fullText = lines.join('\n');
+    const selectedText = fullText.slice(absStart, absEnd);
+    const nextText = `${fullText.slice(0, absStart)}~~${selectedText}~~${fullText.slice(absEnd)}`;
+    setLines(nextText.split('\n'), startPos.line);
+  }
+
   // Commits the popover's edited chart source back into the document when
   // it closes (Close button, backdrop click, or Escape all funnel here via
   // ChartEditorPopover's onClose), replacing the fence's full line range
@@ -880,6 +1004,18 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
       };
     });
 
+  // Task-list checkboxes visible in the current window, with the absolute
+  // top/left (in px, relative to EditorContainer) at which each
+  // CheckboxHitTarget should be drawn, centered over its raw "[ ] "/"[x] "
+  // span using the measured monospace char width.
+  const visibleCheckboxes = taskCheckboxes
+    .filter((c) => c.line >= effectiveWindowStart && c.line < windowEnd)
+    .map((c) => ({
+      checkbox: c,
+      top: (c.line - effectiveWindowStart) * lineHeight + (lineHeight - CHECKBOX_HIT_SIZE) / 2,
+      left: c.column * charWidth - (CHECKBOX_HIT_SIZE - c.length * charWidth) / 2,
+    }));
+
   return (
     <>
       <VirtualScrollContainer ref={scrollContainerRef} onScroll={handleScroll} onWheel={handleWheel} data-testid="virtual-scroll-container">
@@ -929,6 +1065,23 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
                 />
               ))}
             </ChartOverlayLayer>
+            <CheckboxOverlayLayer>
+              {visibleCheckboxes.map(({ checkbox, top, left }) => (
+                <CheckboxHitTarget
+                  key={`checkbox-${checkbox.line}-${checkbox.column}`}
+                  type="button"
+                  className={checkbox.checked ? 'checked' : undefined}
+                  style={{ top, left }}
+                  onClick={() => handleToggleCheckbox(checkbox)}
+                  data-testid="task-checkbox"
+                  data-line={checkbox.line}
+                  aria-label={checkbox.checked ? 'Mark task incomplete' : 'Mark task complete'}
+                  aria-pressed={checkbox.checked}
+                >
+                  <FontAwesomeIcon icon={checkbox.checked ? faSquareCheck : faSquare} />
+                </CheckboxHitTarget>
+              ))}
+            </CheckboxOverlayLayer>
           </EditorContainer>
         </WindowRow>
       </VirtualScrollContainer>
@@ -941,6 +1094,14 @@ const MarkdownOverlayNotepad = ({ lines, setLines, options }: MarkdownOverlayNot
         active={pendingInsertLines !== null}
         onPrepareInsert={setPendingInsertLines}
         onCancelPlacement={() => setPendingInsertLines(null)}
+        onBulletList={handleBulletList}
+        onStrikethrough={handleStrikethrough}
+      />
+      <Snackbar
+        open={strikethroughHintOpen}
+        autoHideDuration={2500}
+        onClose={() => setStrikethroughHintOpen(false)}
+        message="Select some text first to strike it through"
       />
       {isTouch && options.dpad?.showCaret !== false && (
         <Dpad onMove={handleDpadMove} testId="dpad-caret" style={{ bottom: 'auto', top: '180px' }} />

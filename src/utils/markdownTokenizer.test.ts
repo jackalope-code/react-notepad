@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeCharClasses, computeLineSegments, findChartFences } from './markdownTokenizer';
+import { computeCharClasses, computeLineSegments, findChartFences, findTaskCheckboxes } from './markdownTokenizer';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,9 +25,65 @@ describe('computeLineSegments — round-trip safety', () => {
     'nested **bold *and italic* inside**',
     '| a | b |\n| --- | --- |\n| 1 | 2 |',
     '```mermaid\ngraph TD;\n  A --> B;\n```',
+    'This is ~~struck~~ text.',
+    '- [ ] todo one\n- [x] done one',
   ])('reconstructs %j exactly, character-for-character', (text) => {
     const segments = computeLineSegments(text);
     expect(reconstruct(segments)).toBe(text);
+  });
+});
+
+describe('computeCharClasses — strikethrough', () => {
+  it('marks GFM ~~struck~~ text as md-del', () => {
+    const text = 'This is ~~struck~~ text.';
+    const classes = computeCharClasses(text);
+    const bodyIndex = text.indexOf('struck');
+    expect(classes[bodyIndex]).toContain('md-del');
+  });
+});
+
+describe('computeCharClasses — task list checkboxes', () => {
+  it('tags an unchecked checkbox span as md-checkbox-marker md-checkbox-unchecked', () => {
+    const text = '- [ ] todo';
+    const classes = computeCharClasses(text);
+    const checkboxIndex = text.indexOf('[ ]');
+    expect(classes[checkboxIndex]).toContain('md-checkbox-marker');
+    expect(classes[checkboxIndex]).toContain('md-checkbox-unchecked');
+  });
+
+  it('tags a checked checkbox span as md-checkbox-marker md-checkbox-checked', () => {
+    const text = '- [x] done';
+    const classes = computeCharClasses(text);
+    const checkboxIndex = text.indexOf('[x]');
+    expect(classes[checkboxIndex]).toContain('md-checkbox-marker');
+    expect(classes[checkboxIndex]).toContain('md-checkbox-checked');
+  });
+});
+
+describe('findTaskCheckboxes', () => {
+  it('finds a single unchecked checkbox with correct line/column', () => {
+    const text = '- [ ] todo one';
+    const checkboxes = findTaskCheckboxes(text);
+    expect(checkboxes).toHaveLength(1);
+    expect(checkboxes[0]).toMatchObject({ line: 0, column: 2, checked: false });
+    expect(checkboxes[0].length).toBe(4); // "[ ] "
+  });
+
+  it('finds multiple checkboxes with correct checked state and line numbers', () => {
+    const text = '- [ ] todo one\n- [x] done one\n- [ ] todo two';
+    const checkboxes = findTaskCheckboxes(text);
+    expect(checkboxes).toHaveLength(3);
+    expect(checkboxes.map((c) => c.line)).toEqual([0, 1, 2]);
+    expect(checkboxes.map((c) => c.checked)).toEqual([false, true, false]);
+  });
+
+  it('ignores plain (non-task) list items', () => {
+    const text = '- plain item one\n- plain item two';
+    expect(findTaskCheckboxes(text)).toEqual([]);
+  });
+
+  it('returns an empty array for text with no lists', () => {
+    expect(findTaskCheckboxes('just plain text')).toEqual([]);
   });
 });
 

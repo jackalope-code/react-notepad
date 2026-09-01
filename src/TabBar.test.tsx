@@ -167,6 +167,24 @@ describe('TabBar', () => {
     expect(children.indexOf(tabs[tabs.length - 1])).toBeLessThan(children.indexOf(addButton));
   });
 
+  it('gives each tab a minimum width covering 1.5x the settings button plus 1.5x the close button, in addition to the buttons and paddings/gaps themselves', () => {
+    const docs = [makeDoc('1', 'Alpha'), makeDoc('2', 'Beta')];
+    render(
+      <TabBar
+        documents={docs}
+        activeDocumentId="1"
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+        onAddClick={vi.fn()}
+        onSettingsClick={vi.fn()}
+      />
+    );
+    const tab = screen.getAllByRole('tab')[0];
+    // BUTTON_SIZE_REM=1.125, TAB_PADDING_X_REM=0.75, TAB_GAP_REM=0.375:
+    // minWidth = 2*0.75 (padding) + 1.5*1.125*2 (label) + 2*0.375 (gaps) + 2*1.125 (buttons) = 7.875rem.
+    expect(getComputedStyle(tab).minWidth).toBe('7.875rem');
+  });
+
   it('renders a settings button only for the active tab and calls onSettingsClick without triggering onSelect', () => {
     const onSelect = vi.fn();
     const onSettingsClick = vi.fn();

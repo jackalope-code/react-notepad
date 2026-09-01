@@ -14,7 +14,7 @@ import {
   type SelectChangeEvent,
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTable, faChartLine, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
+import { faTable, faChartLine, faPlus, faMinus, faListUl, faStrikethrough } from '@fortawesome/free-solid-svg-icons';
 
 // ---------------------------------------------------------------------------
 // InsertToolbar
@@ -110,9 +110,15 @@ interface InsertToolbarProps {
   active: boolean;
   onPrepareInsert: (lines: string[]) => void;
   onCancelPlacement: () => void;
+  /** Converts the current line/selection into a bulleted list in place —
+   * unlike table/chart, this applies immediately with no placement step. */
+  onBulletList: () => void;
+  /** Wraps the current text selection in ~~ ~~ in place — unlike
+   * table/chart, this applies immediately with no placement step. */
+  onStrikethrough: () => void;
 }
 
-function InsertToolbar({ active, onPrepareInsert, onCancelPlacement }: InsertToolbarProps) {
+function InsertToolbar({ active, onPrepareInsert, onCancelPlacement, onBulletList, onStrikethrough }: InsertToolbarProps) {
   const [expanded, setExpanded] = useState(false);
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
   const [chartDialogOpen, setChartDialogOpen] = useState(false);
@@ -153,6 +159,24 @@ function InsertToolbar({ active, onPrepareInsert, onCancelPlacement }: InsertToo
               aria-label="Insert chart"
             >
               <FontAwesomeIcon icon={faChartLine} /> Insert Chart
+            </ExpandedOption>
+            <ExpandedOption
+              onClick={() => {
+                onBulletList();
+                setExpanded(false);
+              }}
+              aria-label="Bulleted list"
+            >
+              <FontAwesomeIcon icon={faListUl} /> Bulleted List
+            </ExpandedOption>
+            <ExpandedOption
+              onClick={() => {
+                onStrikethrough();
+                setExpanded(false);
+              }}
+              aria-label="Strikethrough"
+            >
+              <FontAwesomeIcon icon={faStrikethrough} /> Strikethrough
             </ExpandedOption>
           </>
         )}
